@@ -232,6 +232,8 @@ static int TestNotification() {
       sceSysmoduleUnloadModule(SCE_SYSMODULE_NOTIFICATION_UTIL);
     }
 
+  start();
+
   return 0;
 }
 

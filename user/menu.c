@@ -30,6 +30,9 @@
 #include <psp2/kernel/sysmem.h>
 #include <psp2/kernel/processmgr.h>
 
+#include <psp2/notificationutil.h> 
+#include "retroachievements.h"
+
 #include <stdio.h>
 #include <stdarg.h>
 #include <stdlib.h>
@@ -73,6 +76,7 @@ static int EnterStandbyMode();
 static int OpenOfficialSettings();
 static int ExitPspEmuApplication();
 static int ResetAdrenalineSettings();
+static int TestNotification();
 
 // RGB colors for the filter box used by f.lux
 static float flux_colors[] = {
@@ -93,6 +97,7 @@ static MenuEntry main_entries[] = {
   { "Open Official Settings",    MENU_ENTRY_TYPE_CALLBACK, 0, OpenOfficialSettings, NULL, NULL, 0 },
   { "Exit PspEmu Application",   MENU_ENTRY_TYPE_CALLBACK, 0, ExitPspEmuApplication, NULL, NULL, 0 },
   { "Exit Adrenaline Menu",      MENU_ENTRY_TYPE_CALLBACK, 0, ExitAdrenalineMenu, NULL, NULL, 0 },
+  { "Test Notification",         MENU_ENTRY_TYPE_CALLBACK, 0, TestNotification, NULL, NULL, 0 },
 };
 
 static MenuEntry settings_entries[] = {
@@ -200,6 +205,32 @@ int ExitAdrenalineMenu() {
   sceKernelSignalSema(settings_semaid, 1);
 
   finishStates();
+
+  return 0;
+}
+
+void ascii2utf(uint16_t* dst, char* src){
+	//Converts the char to UTF
+	if(!src || !dst)return;
+	while(*src)*(dst++)=(*src++);
+	*dst=0x00;
+}
+
+static int TestNotification() {
+  int res = -1;
+  res = sceSysmoduleLoadModule(SCE_SYSMODULE_NOTIFICATION_UTIL);
+
+    if ( res != 0 ) {
+        sceClibPrintf("sceSysmoduleLoadModule: 0x%08x\n", res);
+    }
+    else
+    {
+      SceNotificationUtilProgressFinishParam param;
+      memset(&param,0,sizeof(SceNotificationUtilProgressFinishParam));
+      ascii2utf(param.notificationText,"hi there");
+      sceNotificationUtilSendNotification (param.notificationText);
+      sceSysmoduleUnloadModule(SCE_SYSMODULE_NOTIFICATION_UTIL);
+    }
 
   return 0;
 }

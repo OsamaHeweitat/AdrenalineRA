@@ -20,6 +20,7 @@
 #define __MENU_H__
 
 #include <vita2d.h>
+#include <psp2/notificationutil.h>
 
 enum Colors {
     // Primary colors

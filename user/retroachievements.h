@@ -1,0 +1,24 @@
+#ifndef RETROACHIEVEMENTS_H
+#define RETROACHIEVEMENTS_H
+
+#include <rc_client.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+void initialize_retroachievements_client(void);
+void shutdown_retroachievements_client(void);
+void login_retroachievements_user(const char* username, const char* password);
+void login_remembered_retroachievements_user(const char* username, const char* token);
+void net_init(void);
+void net_term(void);
+void httpInit(void);
+void httpTerm(void);
+int start(void);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif // RETROACHIEVEMENTS_H

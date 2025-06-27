@@ -55,6 +55,8 @@
 
 #include "startdat.h"
 
+#include "retroachievements.h"
+
 INCLUDE_EXTERN_RESOURCE(payloadex_bin);
 
 int _newlib_heap_size_user = 8 * 1024 * 1024;
@@ -541,6 +543,7 @@ static int ScePspemuGetStartupPngPatched(int num, void *png_buf, int *png_size, 
 
 void _start() __attribute__ ((weak, alias("module_start")));
 int module_start(SceSize args, void *argp) {
+  sceSysmoduleLoadModule(SCE_SYSMODULE_NOTIFICATION_UTIL);
   int res;
 
   res = sceSysmoduleLoadModule(SCE_SYSMODULE_LIVEAREA);

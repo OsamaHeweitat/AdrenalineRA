@@ -74,7 +74,7 @@ static void async_http_get(const char* url, const char* user_agent,
     sceHttpGetStatusCode(req, &status_code);
 
     // Read response
-    char* response_buffer = malloc(8192); // Allocate reasonable buffer for response
+    char* response_buffer = malloc(8192 + 1); // Allocate buffer for response plus null terminator
     if (!response_buffer) {
         sceHttpDeleteRequest(req);
         sceHttpDeleteConnection(conn);
@@ -85,6 +85,8 @@ static void async_http_get(const char* url, const char* user_agent,
 
     int read_size = sceHttpReadData(req, response_buffer, 8192);
     if (read_size >= 0) {
+        response_buffer[read_size] = '\0'; // Null-terminate the response
+        sceClibPrintf("[RA DEBUG] HTTP response (%d bytes): %s\n", read_size, response_buffer);
         callback(status_code, response_buffer, read_size, userdata, NULL);
     } else {
         callback(0, NULL, 0, userdata, "Failed to read HTTP response");
@@ -103,7 +105,7 @@ static void async_http_post(const char* url, const char* post_data, const char* 
     int tpl = sceHttpCreateTemplate(user_agent, 1, 1);
     int conn = sceHttpCreateConnectionWithURL(tpl, url, 0);
     int req = sceHttpCreateRequestWithURL(conn, SCE_HTTP_METHOD_POST, url, strlen(post_data));
-    // sceHttpAddRequestHeader(req, "Content-Type", content_type, SCE_HTTP_HEADER_ADD);
+    sceHttpAddRequestHeader(req, "Content-Type", content_type, SCE_HTTP_HEADER_ADD);
     sceClibPrintf("POST URL: %s\n", url);
     sceClibPrintf("POST Data: %s\n", post_data);
     sceClibPrintf("User-Agent: %s\n", user_agent);
@@ -122,7 +124,7 @@ static void async_http_post(const char* url, const char* post_data, const char* 
     sceHttpGetStatusCode(req, &status_code);
 
     // Read response
-    char* response_buffer = malloc(8192); // Allocate reasonable buffer for response
+    char* response_buffer = malloc(8192 + 1); // Allocate buffer for response plus null terminator
     if (!response_buffer) {
         sceHttpDeleteRequest(req);
         sceHttpDeleteConnection(conn);
@@ -133,6 +135,8 @@ static void async_http_post(const char* url, const char* post_data, const char* 
 
     int read_size = sceHttpReadData(req, response_buffer, 8192);
     if (read_size >= 0) {
+        response_buffer[read_size] = '\0'; // Null-terminate the response
+        sceClibPrintf("[RA DEBUG] HTTP response (%d bytes): %s\n", read_size, response_buffer);
         callback(status_code, response_buffer, read_size, userdata, NULL);
     } else {
         callback(0, NULL, 0, userdata, "Failed to read HTTP response");
@@ -361,7 +365,7 @@ int start() {
   }
 
   // read and print response
-  char* response_buffer = malloc(8192);
+  char* response_buffer = malloc(8192 + 1);
   if (!response_buffer) {
     sceHttpDeleteRequest(req);
     sceHttpDeleteConnection(conn);
@@ -371,6 +375,7 @@ int start() {
   // print
   int read_size = sceHttpReadData(req, response_buffer, 8192);
   if (read_size >= 0) {
+    response_buffer[read_size] = '\0'; // Null-terminate the response
     sceClibPrintf("Response: %s\n", response_buffer);
   } else {
     sceClibPrintf("Failed to read HTTP response test\n");

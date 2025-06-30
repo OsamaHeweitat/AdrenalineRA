@@ -548,6 +548,22 @@ int module_start(SceSize args, void *argp) {
 
   res = sceSysmoduleLoadModule(SCE_SYSMODULE_LIVEAREA);
 
+  int res2 = -1;
+  int res3 = -1;
+  int res4 = -1;
+  res2 = sceSysmoduleLoadModule(SCE_SYSMODULE_NET);
+  res3 = sceSysmoduleLoadModule(SCE_SYSMODULE_HTTPS);
+  res4 = sceSysmoduleLoadModule(SCE_SYSMODULE_SSL);
+  if (res2 != 0) {
+    sceClibPrintf("sceSysmoduleLoadModule net: 0x%08x\n", res2);
+  } else { sceClibPrintf("success net: 0x%08x\n", res2); }
+  if (res3 != 0) {
+    sceClibPrintf("sceSysmoduleLoadModule https: 0x%08x\n", res3);
+  } else { sceClibPrintf("success https: 0x%08x\n", res3); }
+  if (res4 != 0) {
+    sceClibPrintf("sceSysmoduleLoadModule ssl: 0x%08x\n", res4);
+  } else { sceClibPrintf("success ssl: 0x%08x\n", res4); }
+
   if ( res != 0 ) {
       sceClibPrintf("sceSysmoduleLoadModule: 0x%08x\n", res);
   }

@@ -259,7 +259,7 @@ void login_remembered_retroachievements_user(const char* username, const char* t
 }
 
 void net_init() {
-  sceSysmoduleLoadModule(SCE_SYSMODULE_NET);
+  // sceSysmoduleLoadModule(SCE_SYSMODULE_NET);
 
   static char memory[16 * 1024];
 	SceNetInitParam param;
@@ -287,7 +287,7 @@ void net_term() {
 }
 
 void http_init() {
-  sceSysmoduleLoadModule(SCE_SYSMODULE_HTTPS);
+  // sceSysmoduleLoadModule(SCE_SYSMODULE_HTTPS);
 
   // sceHttpInit(1 * 1024 * 1024);
   int res = sceHttpInit(1 * 1024 * 1024);
@@ -305,7 +305,7 @@ void http_term() {
 }
 
 void ssl_init() {
-  sceSysmoduleLoadModule(SCE_SYSMODULE_SSL);
+  // sceSysmoduleLoadModule(SCE_SYSMODULE_SSL);
 
   int res = sceSslInit(1 * 1024 * 1024);
   if (res < 0) {
@@ -322,12 +322,12 @@ void ssl_term() {
 }
 
 int start() {
-  // sceClibPrintf("we're trying net init\n");
-  // net_init();
-  // sceClibPrintf("we're trying http init\n");
-  // http_init();
-  // sceClibPrintf("we're trying ssl init\n");
-  // ssl_init();
+  sceClibPrintf("we're trying net init\n");
+  net_init();
+  sceClibPrintf("we're trying http init\n");
+  http_init();
+  sceClibPrintf("we're trying ssl init\n");
+  ssl_init();
 
   if (sceSysmoduleIsLoaded(SCE_SYSMODULE_NET) == SCE_SYSMODULE_LOADED) {
     sceClibPrintf("Net module loaded\n");
@@ -344,16 +344,6 @@ int start() {
   if (sceSysmoduleIsLoaded(SCE_SYSMODULE_SSL) == SCE_SYSMODULE_LOADED) {
     sceClibPrintf("SSL module loaded\n");
   } else {
-    sceClibPrintf("SSL module not loaded\n");
-  }
-
-  if(sceSysmoduleIsLoaded(SCE_SYSMODULE_NET) != SCE_SYSMODULE_LOADED) {
-    sceClibPrintf("Net module not loaded\n");
-  }
-  if(sceSysmoduleIsLoaded(SCE_SYSMODULE_HTTPS) != SCE_SYSMODULE_LOADED) {
-    sceClibPrintf("HTTPS module not loaded\n");
-  }
-  if(sceSysmoduleIsLoaded(SCE_SYSMODULE_SSL) != SCE_SYSMODULE_LOADED) {
     sceClibPrintf("SSL module not loaded\n");
   }
 

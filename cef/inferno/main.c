@@ -66,6 +66,21 @@ int setup_umd_device(void)
 	int ret;
 
 	g_iso_fn = GetUmdFile();
+	
+	// printf("[RAPSP DEBUG] Setup UMD device: %s\n", g_iso_fn);
+	// if (g_iso_fn != NULL) {
+	// 	printf("[RAPSP DEBUG] gonna try writing: %s\n", g_iso_fn);
+	// 	SceUID fd = sceIoOpen("ms0:/temp/current_game.txt", PSP_O_WRONLY | PSP_O_CREAT | PSP_O_TRUNC, 0777);
+	// 	printf("[RAPSP DEBUG] fd: %s\n", fd);
+	// 	if (fd >= 0) {
+	// 		printf("[RAPSP DEBUG] Writing game path at: %s\n", fd);
+	// 		sceIoWrite(fd, g_iso_fn, strlen(g_iso_fn));
+	// 		sceIoClose(fd);
+	// 	} else {
+	// 		printf("[RAPSP DEBUG] Failed to open file: %s\n", fd);
+	// 	}
+	// }
+	
 	// always use umd game type
 	infernoSetDiscType(PSP_UMD_TYPE_GAME);
 	ret = sceIoAddDrv(&g_iodrv);

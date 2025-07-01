@@ -422,6 +422,10 @@ static int InitAdrenaline() {
   if (draw_thid >= 0)
     sceKernelStartThread(draw_thid, 0, NULL);
 
+  // Initialize RetroAchievements
+  sceClibPrintf("[RA DEBUG] Initializing RetroAchievements\n");
+  start();
+
   return 0;
 }
 
@@ -1126,6 +1130,10 @@ int module_start(SceSize args, void *argp) {
 }
 
 int module_stop(SceSize args, void *argp) {
+  // Shutdown RetroAchievements
+  sceClibPrintf("[RA DEBUG] Shutting down RetroAchievements\n");
+  shutdown_retroachievements_client();
+  
   int i;
   for (i = n_uids - 1; i >= 0; i++) {
     taiInjectRelease(uids[i]);

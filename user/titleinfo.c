@@ -35,6 +35,8 @@ int ScePspemuInitTitleSpecificInfoPatched(const char *titleid, SceUID uid) {
   uint32_t *info = NULL;
   uint32_t *unk = NULL;
 
+  sceClibPrintf("[RAPSP DEBUG] ScePspemuInitTitleSpecificInfoPatched: %s\n", titleid);
+
   if (module_nid == 0x2714F07D) { // 3.60 retail
     // Make __sce_menuinfo path
     snprintf((char *)(data_addr + 0x11C7D0C), 0x80, "ms0:PSP/GAME/%s/__sce_menuinfo", titleid);

@@ -16,7 +16,11 @@
 #include <psp2/io/fcntl.h>
 #include <psp2/io/stat.h>
 #include <psp2/io/dirent.h>
+#include <psp2/kernel/threadmgr.h>
 
+#include "main.h"
+#include "../adrenaline_compat.h"
+#include <ctype.h>
 
 rc_client_t* g_client = NULL;
 
@@ -94,8 +98,9 @@ static void async_http_get(const char* url, const char* user_agent,
     int status_code = 0;
     sceHttpGetStatusCode(req, &status_code);
 
-    // Read response
-    char* response_buffer = malloc(8192 + 1); // Allocate buffer for response plus null terminator
+    // Read response with dynamic buffer
+    size_t buffer_size = 32768; // Start with 32KB
+    char* response_buffer = malloc(buffer_size);
     if (!response_buffer) {
         sceHttpDeleteRequest(req);
         sceHttpDeleteConnection(conn);
@@ -104,14 +109,42 @@ static void async_http_get(const char* url, const char* user_agent,
         return;
     }
 
-    int read_size = sceHttpReadData(req, response_buffer, 8192);
-    if (read_size >= 0) {
-        response_buffer[read_size] = '\0'; // Null-terminate the response
-        sceClibPrintf("[RA DEBUG] HTTP response (%d bytes): %s\n", read_size, response_buffer);
-        callback(status_code, response_buffer, read_size, userdata, NULL);
-    } else {
+    size_t total_read = 0;
+    int read_size;
+    do {
+        read_size = sceHttpReadData(req, response_buffer + total_read, buffer_size - total_read - 1);
+        if (read_size > 0) {
+            total_read += read_size;
+            // If we're running out of space, double the buffer
+            if (total_read >= buffer_size - 1024) {
+                size_t new_size = buffer_size * 2;
+                char* new_buffer = realloc(response_buffer, new_size);
+                if (!new_buffer) {
+                    free(response_buffer);
+                    sceHttpDeleteRequest(req);
+                    sceHttpDeleteConnection(conn);
+                    sceHttpDeleteTemplate(tpl);
+                    callback(0, NULL, 0, userdata, "Failed to reallocate memory for response");
+                    return;
+                }
+                response_buffer = new_buffer;
+                buffer_size = new_size;
+            }
+        }
+    } while (read_size > 0);
+
+    if (read_size < 0) {
+        free(response_buffer);
+        sceHttpDeleteRequest(req);
+        sceHttpDeleteConnection(conn);
+        sceHttpDeleteTemplate(tpl);
         callback(0, NULL, 0, userdata, "Failed to read HTTP response");
+        return;
     }
+
+    response_buffer[total_read] = '\0'; // Null-terminate the response
+    sceClibPrintf("[RA DEBUG] HTTP response (%d bytes): %s\n", (int)total_read, response_buffer);
+    callback(status_code, response_buffer, total_read, userdata, NULL);
 
     free(response_buffer);
     sceHttpDeleteRequest(req);
@@ -144,8 +177,9 @@ static void async_http_post(const char* url, const char* post_data, const char* 
     int status_code = 0;
     sceHttpGetStatusCode(req, &status_code);
 
-    // Read response
-    char* response_buffer = malloc(8192 + 1); // Allocate buffer for response plus null terminator
+    // Read response with dynamic buffer
+    size_t buffer_size = 32768; // Start with 32KB
+    char* response_buffer = malloc(buffer_size);
     if (!response_buffer) {
         sceHttpDeleteRequest(req);
         sceHttpDeleteConnection(conn);
@@ -154,14 +188,42 @@ static void async_http_post(const char* url, const char* post_data, const char* 
         return;
     }
 
-    int read_size = sceHttpReadData(req, response_buffer, 8192);
-    if (read_size >= 0) {
-        response_buffer[read_size] = '\0'; // Null-terminate the response
-        sceClibPrintf("[RA DEBUG] HTTP response (%d bytes): %s\n", read_size, response_buffer);
-        callback(status_code, response_buffer, read_size, userdata, NULL);
-    } else {
+    size_t total_read = 0;
+    int read_size;
+    do {
+        read_size = sceHttpReadData(req, response_buffer + total_read, buffer_size - total_read - 1);
+        if (read_size > 0) {
+            total_read += read_size;
+            // If we're running out of space, double the buffer
+            if (total_read >= buffer_size - 1024) {
+                size_t new_size = buffer_size * 2;
+                char* new_buffer = realloc(response_buffer, new_size);
+                if (!new_buffer) {
+                    free(response_buffer);
+                    sceHttpDeleteRequest(req);
+                    sceHttpDeleteConnection(conn);
+                    sceHttpDeleteTemplate(tpl);
+                    callback(0, NULL, 0, userdata, "Failed to reallocate memory for response");
+                    return;
+                }
+                response_buffer = new_buffer;
+                buffer_size = new_size;
+            }
+        }
+    } while (read_size > 0);
+
+    if (read_size < 0) {
+        free(response_buffer);
+        sceHttpDeleteRequest(req);
+        sceHttpDeleteConnection(conn);
+        sceHttpDeleteTemplate(tpl);
         callback(0, NULL, 0, userdata, "Failed to read HTTP response");
+        return;
     }
+
+    response_buffer[total_read] = '\0'; // Null-terminate the response
+    sceClibPrintf("[RA DEBUG] HTTP response (%d bytes): %s\n", (int)total_read, response_buffer);
+    callback(status_code, response_buffer, total_read, userdata, NULL);
 
     free(response_buffer);
     sceHttpDeleteRequest(req);
@@ -411,6 +473,358 @@ int load_retroachievements_credentials(char* username, size_t username_size, cha
     return 0;
 }
 
+
+static void load_game_callback(int result, const char* error_message, rc_client_t* client, void* userdata)
+{
+  if (result != RC_OK)
+  {
+    show_message("RetroAchievements game load failed: %s", error_message);
+    return;
+  }
+
+  // announce that the game is ready. we'll cover this in the next section.
+  // show_game_placard();
+}
+
+void load_game(const uint8_t* rom, size_t rom_size)
+{
+  sceClibPrintf("[RA DEBUG] load_game called\n");
+  sceClibPrintf("[RA DEBUG] ROM pointer: %p, size: %u\n", rom, (unsigned int)rom_size);
+  if (!g_client) {
+    sceClibPrintf("[RA DEBUG] g_client is NULL in load_game!\n");
+    return;
+  }
+  sceClibPrintf("[RA DEBUG] Calling rc_client_begin_identify_and_load_game (memory)\n");
+  rc_client_begin_identify_and_load_game(g_client, RC_CONSOLE_PSP, NULL, rom, rom_size, load_game_callback, NULL);
+}
+
+void load_game_from_file(const char* path)
+{
+  sceClibPrintf("[RA DEBUG] load_game_from_file called\n");
+  if (!path) {
+    sceClibPrintf("[RA DEBUG] load_game_from_file: path is NULL!\n");
+    return;
+  }
+  sceClibPrintf("[RA DEBUG] Path: %s\n", path);
+  if (!g_client) {
+    sceClibPrintf("[RA DEBUG] g_client is NULL in load_game_from_file!\n");
+    return;
+  }
+  sceClibPrintf("[RA DEBUG] Calling rc_client_begin_identify_and_load_game (file) with path: %s\n", path);
+  rc_client_begin_identify_and_load_game(g_client, RC_CONSOLE_PSP, path, NULL, 0, load_game_callback, NULL);
+}
+
+#define ISO_DIR "ux0:pspemu/ISO"
+#define GAME_DIR "ux0:pspemu/PSP/GAME"
+#define CACHE_FILE "ux0:data/ra_titleid_cache.txt"
+
+#define MAX_TITLEID 64
+#define MAX_PATH 256
+#define MAX_CACHE_ENTRIES 1024
+
+typedef struct {
+    char titleid[MAX_TITLEID];
+    char path[MAX_PATH];
+} TitleIdEntry;
+
+static TitleIdEntry titleid_cache[MAX_CACHE_ENTRIES];
+static int titleid_cache_count = 0;
+
+#define ISO_SECTOR_SIZE 2048
+
+// // Helper: read a sector from ISO
+// static int read_iso_sector(SceUID fd, uint32_t sector, void* buf) {
+//     if (sceIoLseek(fd, sector * ISO_SECTOR_SIZE, SCE_SEEK_SET) < 0)
+//         return -1;
+//     return sceIoRead(fd, buf, ISO_SECTOR_SIZE);
+// }
+
+// // Helper: robust ISO9660 filename match (case-insensitive, ignore ;1, ignore spaces)
+// static int iso9660_name_match(const char* entry, int entry_len, const char* target) {
+//     int tlen = strlen(target);
+//     int elen = entry_len;
+//     // Remove trailing spaces
+//     while (elen > 0 && entry[elen-1] == ' ') elen--;
+//     // Remove version suffix
+//     int vpos = -1;
+//     for (int i = 0; i < elen; ++i) {
+//         if (entry[i] == ';') { vpos = i; break; }
+//     }
+//     if (vpos >= 0) elen = vpos;
+//     if (elen != tlen) return 0;
+//     for (int i = 0; i < tlen; ++i) {
+//         if (tolower((unsigned char)entry[i]) != tolower((unsigned char)target[i])) return 0;
+//     }
+//     return 1;
+// }
+
+// // Helper: parse SFO for DISC_ID or TITLE_ID
+// static int parse_sfo_for_titleid(const uint8_t* sfo, size_t sfo_size, char* titleid, size_t titleid_size) {
+//     typedef struct {
+//         uint32_t magic;
+//         uint32_t version;
+//         uint32_t key_table_offset;
+//         uint32_t data_table_offset;
+//         uint32_t entries_count;
+//     } __attribute__((packed)) SfoHeader;
+//     typedef struct {
+//         uint16_t key_offset;
+//         uint8_t  param_fmt;
+//         uint8_t  len;
+//         uint32_t data_len;
+//         uint32_t data_offset;
+//     } __attribute__((packed)) SfoEntry;
+//     if (sfo_size < sizeof(SfoHeader)) return -1;
+//     const SfoHeader* hdr = (const SfoHeader*)sfo;
+//     if (hdr->magic != 0x46535000) return -1; // "PSF\0"
+//     const char* key_table = (const char*)sfo + hdr->key_table_offset;
+//     const uint8_t* data_table = sfo + hdr->data_table_offset;
+//     const SfoEntry* entries = (const SfoEntry*)(sfo + sizeof(SfoHeader));
+//     for (uint32_t i = 0; i < hdr->entries_count; ++i) {
+//         const char* key = key_table + entries[i].key_offset;
+//         if (strcmp(key, "DISC_ID") == 0 || strcmp(key, "TITLE_ID") == 0) {
+//             strncpy(titleid, (const char*)(data_table + entries[i].data_offset), titleid_size-1);
+//             titleid[titleid_size-1] = '\0';
+//             return 0;
+//         }
+//     }
+//     return -1;
+// }
+
+// // Fallback: scan first 64KB for a titleid pattern
+// static int fallback_extract_titleid_from_iso(const char* iso_path, char* titleid, size_t titleid_size) {
+//     sceClibPrintf("[RA DEBUG] fallback_extract_titleid_from_iso: ENTER path=%s, titleid_size=%u\n", iso_path, (unsigned)titleid_size);
+//     SceUID fd = sceIoOpen(iso_path, SCE_O_RDONLY, 0);
+//     sceClibPrintf("[RA DEBUG] fallback: after sceIoOpen, fd=%d\n", fd);
+//     if (fd < 0) {
+//         sceClibPrintf("[RA DEBUG] fallback: failed to open file\n");
+//         return -1;
+//     }
+//     char buf[0x10000];
+//     sceClibPrintf("[RA DEBUG] fallback: before sceIoRead\n");
+//     int read = sceIoRead(fd, buf, sizeof(buf));
+//     sceClibPrintf("[RA DEBUG] fallback: after sceIoRead, read=%d\n", read);
+//     sceIoClose(fd);
+//     sceClibPrintf("[RA DEBUG] fallback: after sceIoClose\n");
+//     if (read <= 0) {
+//         sceClibPrintf("[RA DEBUG] fallback: read <= 0\n");
+//         return -1;
+//     }
+//     for (int i = 0; i < read - 9; ++i) {
+//         if (i % 1024 == 0) sceClibPrintf("[RA DEBUG] fallback: loop i=%d\n", i);
+//         sceClibPrintf("[RA DEBUG] fallback: i=%d, buf[i..i+8]=%c%c%c%c%c%c%c%c%c\n", i,
+//             buf[i], buf[i+1], buf[i+2], buf[i+3], buf[i+4], buf[i+5], buf[i+6], buf[i+7], buf[i+8]);
+//         if ((memcmp(&buf[i], "ULUS", 4) == 0 || memcmp(&buf[i], "NPUZ", 4) == 0 ||
+//              memcmp(&buf[i], "ULES", 4) == 0 || memcmp(&buf[i], "UCUS", 4) == 0 ||
+//              memcmp(&buf[i], "NPJH", 4) == 0 || memcmp(&buf[i], "NPUG", 4) == 0) &&
+//             isalnum((unsigned char)buf[i+4]) && isalnum((unsigned char)buf[i+5]) && isalnum((unsigned char)buf[i+6]) && isalnum((unsigned char)buf[i+7]) && isalnum((unsigned char)buf[i+8])) {
+//             size_t copy_len = (titleid_size - 1 < 9) ? titleid_size - 1 : 9;
+//             sceClibPrintf("[RA DEBUG] fallback: found candidate at offset %d, copy_len=%u\n", i, (unsigned)copy_len);
+//             strncpy(titleid, &buf[i], copy_len);
+//             titleid[copy_len] = '\0';
+//             sceClibPrintf("[RA DEBUG] fallback: extracted titleid=%s\n", titleid);
+//             return 0;
+//         }
+//     }
+//     sceClibPrintf("[RA DEBUG] fallback: no pattern found, returning -1\n");
+//     return -1;
+// }
+
+// // Minimal ISO9660 parser to extract titleid from ISO
+// int extract_titleid_from_iso(const char* iso_path, char* titleid, size_t titleid_size) {
+//     SceUID fd = sceIoOpen(iso_path, SCE_O_RDONLY, 0);
+//     if (fd < 0) return -1;
+//     uint8_t sector[ISO_SECTOR_SIZE];
+//     int found_pvd = 0;
+//     uint32_t pvd_sector = 16;
+//     for (; pvd_sector < 32; ++pvd_sector) {
+//         if (read_iso_sector(fd, pvd_sector, sector) != ISO_SECTOR_SIZE) break;
+//         if (sector[0] == 1 && memcmp(&sector[1], "CD001", 5) == 0) {
+//             found_pvd = 1;
+//             break;
+//         }
+//     }
+//     if (!found_pvd) { sceIoClose(fd); return -1; }
+//     uint8_t* root_dir_record = sector + 156;
+//     uint32_t root_extent = root_dir_record[2] | (root_dir_record[3]<<8) | (root_dir_record[4]<<16) | (root_dir_record[5]<<24);
+//     uint32_t root_size = root_dir_record[10] | (root_dir_record[11]<<8) | (root_dir_record[12]<<16) | (root_dir_record[13]<<24);
+//     uint8_t* dir_buf = malloc(root_size);
+//     if (!dir_buf) { sceIoClose(fd); return -1; }
+//     if (sceIoLseek(fd, root_extent * ISO_SECTOR_SIZE, SCE_SEEK_SET) < 0 ||
+//         sceIoRead(fd, dir_buf, root_size) != (int)root_size) {
+//         free(dir_buf); sceIoClose(fd); return -1;
+//     }
+//     uint32_t find_dir_entry(const uint8_t* buf, uint32_t size, const char* name, uint32_t* extent, uint32_t* data_size) {
+//         uint32_t pos = 0;
+//         while (pos + 33 < size) {
+//             uint8_t len = buf[pos];
+//             if (len == 0) break;
+//             uint8_t name_len = buf[pos+32];
+//             if (iso9660_name_match((const char*)&buf[pos+33], name_len, name)) {
+//                 *extent = buf[pos+2] | (buf[pos+3]<<8) | (buf[pos+4]<<16) | (buf[pos+5]<<24);
+//                 *data_size = buf[pos+10] | (buf[pos+11]<<8) | (buf[pos+12]<<16) | (buf[pos+13]<<24);
+//                 return 1;
+//             }
+//             pos += len;
+//         }
+//         return 0;
+//     }
+//     uint32_t psp_game_extent = 0, psp_game_size = 0;
+//     if (!find_dir_entry(dir_buf, root_size, "PSP_GAME", &psp_game_extent, &psp_game_size)) {
+//         free(dir_buf); sceIoClose(fd); return -1;
+//     }
+//     uint8_t* psp_game_dir = malloc(psp_game_size);
+//     if (!psp_game_dir) { free(dir_buf); sceIoClose(fd); return -1; }
+//     if (sceIoLseek(fd, psp_game_extent * ISO_SECTOR_SIZE, SCE_SEEK_SET) < 0 ||
+//         sceIoRead(fd, psp_game_dir, psp_game_size) != (int)psp_game_size) {
+//         free(psp_game_dir); free(dir_buf); sceIoClose(fd); return -1;
+//     }
+//     uint32_t param_sfo_extent = 0, param_sfo_size = 0;
+//     if (!find_dir_entry(psp_game_dir, psp_game_size, "PARAM.SFO", &param_sfo_extent, &param_sfo_size)) {
+//         free(psp_game_dir); free(dir_buf); sceIoClose(fd); return -1;
+//     }
+//     uint8_t* sfo_buf = malloc(param_sfo_size);
+//     if (!sfo_buf) { free(psp_game_dir); free(dir_buf); sceIoClose(fd); return -1; }
+//     if (sceIoLseek(fd, param_sfo_extent * ISO_SECTOR_SIZE, SCE_SEEK_SET) < 0 ||
+//         sceIoRead(fd, sfo_buf, param_sfo_size) != (int)param_sfo_size) {
+//         free(sfo_buf); free(psp_game_dir); free(dir_buf); sceIoClose(fd); return -1;
+//     }
+//     int result = parse_sfo_for_titleid(sfo_buf, param_sfo_size, titleid, titleid_size);
+//     free(sfo_buf);
+//     free(psp_game_dir);
+//     free(dir_buf);
+//     sceIoClose(fd);
+//     if (result == 0) return 0;
+//     // fallback for non-standard ISOs
+//     sceClibPrintf("[RA DEBUG] fallback: trying fallback_extract_titleid_from_iso\n");
+//     if (fallback_extract_titleid_from_iso(iso_path, titleid, titleid_size) == 0) return 0;
+//     return -1;
+// }
+
+// // Scan ISOs and EBOOTs for titleids
+// void scan_and_cache_titleids() {
+//     titleid_cache_count = 0;
+//     // Scan ISO_DIR
+//     SceUID dir = sceIoDopen(ISO_DIR);
+//     if (dir >= 0) {
+//         SceIoDirent ent;
+//         memset(&ent, 0, sizeof(ent));
+//         while (sceIoDread(dir, &ent) > 0 && titleid_cache_count < MAX_CACHE_ENTRIES) {
+//             if (!(ent.d_stat.st_mode & SCE_S_IFREG)) continue;
+//             char iso_path[MAX_PATH];
+//             snprintf(iso_path, sizeof(iso_path), "%s/%s", ISO_DIR, ent.d_name);
+//             char titleid[MAX_TITLEID] = {0};
+//             int res = extract_titleid_from_iso(iso_path, titleid, sizeof(titleid));
+//             sceClibPrintf("[RA DEBUG] ISO: %s, titleid extraction result: %d, titleid: %s\n", iso_path, res, titleid);
+//             if (res == 0 && titleid[0]) {
+//                 strncpy(titleid_cache[titleid_cache_count].titleid, titleid, MAX_TITLEID-1);
+//                 strncpy(titleid_cache[titleid_cache_count].path, iso_path, MAX_PATH-1);
+//                 titleid_cache_count++;
+//             }
+//         }
+//         sceIoDclose(dir);
+//     }
+//     // // Scan GAME_DIR
+//     // dir = sceIoDopen(GAME_DIR);
+//     // if (dir >= 0) {
+//     //     SceIoDirent ent;
+//     //     memset(&ent, 0, sizeof(ent));
+//     //     while (sceIoDread(dir, &ent) > 0 && titleid_cache_count < MAX_CACHE_ENTRIES) {
+//     //         if (!(ent.d_stat.st_mode & SCE_S_IFDIR)) continue;
+//     //         char sfo_path[MAX_PATH];
+//     //         snprintf(sfo_path, sizeof(sfo_path), "%s/%s/PARAM.SFO", GAME_DIR, ent.d_name);
+//     //         char titleid[MAX_TITLEID] = {0};
+//     //         if (extract_titleid_from_sfo(sfo_path, titleid, sizeof(titleid)) == 0) {
+//     //             char eboot_path[MAX_PATH];
+//     //             snprintf(eboot_path, sizeof(eboot_path), "%s/%s/EBOOT.PBP", GAME_DIR, ent.d_name);
+//     //             strncpy(titleid_cache[titleid_cache_count].titleid, titleid, MAX_TITLEID-1);
+//     //             strncpy(titleid_cache[titleid_cache_count].path, eboot_path, MAX_PATH-1);
+//     //             titleid_cache_count++;
+//     //         }
+//     //     }
+//     //     sceIoDclose(dir);
+//     // }
+//     // Save cache to file
+//     SceUID fd = sceIoOpen(CACHE_FILE, SCE_O_WRONLY | SCE_O_CREAT | SCE_O_TRUNC, 0666);
+//     if (fd >= 0) {
+//         for (int i = 0; i < titleid_cache_count; ++i) {
+//             char line[MAX_TITLEID + MAX_PATH + 4];
+//             snprintf(line, sizeof(line), "%s|%s\n", titleid_cache[i].titleid, titleid_cache[i].path);
+//             sceIoWrite(fd, line, strlen(line));
+//         }
+//         sceIoClose(fd);
+//     }
+//     sceClibPrintf("[RA DEBUG] Scanned and cached %d titleids\n", titleid_cache_count);
+// }
+
+// Load cache from file
+void load_titleid_cache() {
+    titleid_cache_count = 0;
+    SceUID fd = sceIoOpen(CACHE_FILE, SCE_O_RDONLY, 0);
+    if (fd < 0) return;
+    char buf[4096];
+    int read = sceIoRead(fd, buf, sizeof(buf)-1);
+    sceIoClose(fd);
+    if (read <= 0) return;
+    buf[read] = '\0';
+    char* line = strtok(buf, "\n");
+    while (line && titleid_cache_count < MAX_CACHE_ENTRIES) {
+        char* sep = strchr(line, '|');
+        if (sep) {
+            *sep = '\0';
+            strncpy(titleid_cache[titleid_cache_count].titleid, line, MAX_TITLEID-1);
+            strncpy(titleid_cache[titleid_cache_count].path, sep+1, MAX_PATH-1);
+            titleid_cache_count++;
+        }
+        line = strtok(NULL, "\n");
+    }
+    sceClibPrintf("[RA DEBUG] Loaded %d titleids from cache\n", titleid_cache_count);
+}
+
+// Lookup file path by titleid
+const char* lookup_path_by_titleid(const char* titleid) {
+    for (int i = 0; i < titleid_cache_count; ++i) {
+        if (strcmp(titleid_cache[i].titleid, titleid) == 0) {
+            return titleid_cache[i].path;
+        }
+    }
+    return NULL;
+}
+
+// Polling thread: check for new titleid from adrenaline shared memory
+int titleid_polling_thread(SceSize args, void* argp) {
+  sceClibPrintf("[RA DEBUG] titleid_polling_thread started\n");
+    char last_titleid[MAX_TITLEID] = {0};
+    while (1) {
+        // Read adrenaline->titleid from shared memory
+        SceAdrenaline *adrenaline = (SceAdrenaline *)ScePspemuConvertAddress(ADRENALINE_ADDRESS, KERMIT_INPUT_MODE, ADRENALINE_SIZE);
+        char titleid[MAX_TITLEID] = {0};
+        strncpy(titleid, adrenaline->titleid, MAX_TITLEID-1);
+        titleid[MAX_TITLEID-1] = '\0';
+        if (titleid[0] != '\0' && strcmp(titleid, last_titleid) != 0) {
+            sceClibPrintf("[RA DEBUG] New titleid detected: %s\n", titleid);
+            const char* path = lookup_path_by_titleid(titleid);
+            if (path) {
+                sceClibPrintf("[RA DEBUG] Path for titleid %s: %s\n", titleid, path);
+                load_game_from_file(path);
+            } else {
+                sceClibPrintf("[RA DEBUG] Path for titleid %s not found in cache\n", titleid);
+            }
+            strncpy(last_titleid, titleid, MAX_TITLEID-1);
+        }
+        sceKernelDelayThread(1 * 1000 * 1000); // 1 second
+    }
+    return 0;
+}
+
+// Call this at startup
+void start_titleid_polling() {
+    load_titleid_cache();
+    SceUID thid = sceKernelCreateThread("titleid_polling_thread", titleid_polling_thread, 0x10000100, 0x4000, 0, 0, NULL);
+    if (thid >= 0)
+        sceKernelStartThread(thid, 0, NULL);
+}
+
 int start() {
   sceClibPrintf("we're trying net init\n");
   net_init();
@@ -479,47 +893,8 @@ int start() {
     login_retroachievements_user("driagonv", "REMOVED");
   }
 
+  // scan_and_cache_titleids();
+  start_titleid_polling();
+
   return 0;
 }
-
-// static void load_game_callback(int result, const char* error_message, rc_client_t* client, void* userdata)
-// {
-//   if (result != RC_OK)
-//   {
-//     show_message("RetroAchievements game load failed: %s", error_message);
-//     return;
-//   }
-
-//   // announce that the game is ready. we'll cover this in the next section.
-//   // show_game_placard();
-// }
-
-// void load_game(const uint8_t* rom, size_t rom_size)
-// {
-//   sceClibPrintf("[RA DEBUG] load_game called\n");
-//   sceClibPrintf("[RA DEBUG] ROM pointer: %p, size: %u\n", rom, (unsigned int)rom_size);
-//   if (!g_client) {
-//     sceClibPrintf("[RA DEBUG] g_client is NULL in load_game!\n");
-//     return;
-//   }
-//   sceClibPrintf("[RA DEBUG] Calling rc_client_begin_identify_and_load_game (memory)\n");
-//   rc_client_begin_identify_and_load_game(g_client, RC_CONSOLE_PSP, 
-//       NULL, rom, rom_size, load_game_callback, NULL);
-// }
-
-// void load_game_from_file(const char* path)
-// {
-//   sceClibPrintf("[RA DEBUG] load_game_from_file called\n");
-//   if (!path) {
-//     sceClibPrintf("[RA DEBUG] load_game_from_file: path is NULL!\n");
-//     return;
-//   }
-//   sceClibPrintf("[RA DEBUG] Path: %s\n", path);
-//   if (!g_client) {
-//     sceClibPrintf("[RA DEBUG] g_client is NULL in load_game_from_file!\n");
-//     return;
-//   }
-//   sceClibPrintf("[RA DEBUG] Calling rc_client_begin_identify_and_load_game (file) with path: %s\n", path);
-//   rc_client_begin_identify_and_load_game(g_client, RC_CONSOLE_PSP, 
-//       path, NULL, 0, load_game_callback, NULL);
-// }

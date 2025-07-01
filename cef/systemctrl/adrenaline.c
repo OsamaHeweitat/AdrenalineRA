@@ -297,6 +297,54 @@ void PatchPowerService2(u32 text_addr) {
 	ClearCaches();
 }
 
+// Function to get the current game file path
+// int getGameFilePath(char *path, int n) {
+//     int bootfrom = sceKernelBootFrom();
+//     if (bootfrom == PSP_BOOT_DISC) {
+//         // UMD/ISO: always disc0
+//         strncpy(path, "disc0:/PSP_GAME/SYSDIR/BOOT.BIN", n-1);
+//         path[n-1] = '\0';
+//         return 0;
+//     } else if (bootfrom == PSP_BOOT_MS) {
+//         // Memory Stick: use the real file path
+//         char *filename = sceKernelInitFileName();
+//         if (!filename)
+//             return -1;
+//         strncpy(path, filename, n-1);
+//         path[n-1] = '\0';
+//         return 0;
+//     }
+//     // Unknown source
+//     path[0] = '\0';
+//     return -2;
+// }
+
+// // Polling thread to print the game file path every 2 seconds
+// int game_path_polling_thread(SceSize args, void *argp) {
+//     char path[256];
+//     while (1) {
+//         if (getGameFilePath(path, sizeof(path)) == 0) {
+//             int exists = 0;
+//             SceIoStat stat;
+//             if (sceIoGetstat(path, &stat) == 0) {
+//                 exists = 1;
+//             }
+//             printf("[RA DEBUG] Current game file path: %s\n", path);
+//             printf("[RA DEBUG] Path exists: %s\n", exists ? "YES" : "NO");
+//         } else {
+//             printf("[RA DEBUG] Could not determine game file path.\n");
+//         }
+// 			void *game_info = sceKernelGetGameInfo661();
+// 			printf("[RAPSP DEBUG] Game info: %s\n", game_info);
+
+// 			char *filename = sceKernelInitFileName();
+// 			printf("[RAPSP DEBUG] Filename: %s\n", filename);
+
+//         sceKernelDelayThread(2 * 1000 * 1000); // 2 seconds
+//     }
+//     return 0;
+// }
+
 int initAdrenaline() {
 	// Register sysevent handler
 	static PspSysEventHandler event_handler = {
@@ -322,6 +370,11 @@ int initAdrenaline() {
 		return thid;
 
 	sceKernelStartThread(thid, 0, NULL);
+
+    // // Start the game path polling thread
+    // SceUID poll_thid = sceKernelCreateThread("game_path_polling_thread", game_path_polling_thread, 0x10, 0x1000, 0, NULL);
+    // if (poll_thid >= 0)
+    //     sceKernelStartThread(poll_thid, 0, NULL);
 
   *(u32 *)DRAW_NATIVE = 0;
 

@@ -17,6 +17,9 @@
 */
 
 #include <common.h>
+// #include <pspdebug.h>
+// #include <pspiofilemgr.h>
+// #include <string.h>
 
 #include "virtualpbpmgr.h"
 #include "isofs_driver/umd9660_driver.h"
@@ -110,6 +113,29 @@ int GetIsoIndex(const char *file) {
 
 int LoadExecVSHCommonPatched(int apitype, char *file, struct SceKernelLoadExecVSHParam *param, int unk2) {
 	int k1 = pspSdkSetK1(0);
+	// pspDebugScreenPrintf("[RAPSP DEBUG] LoadExecVSHCommonPatched: %s\n", file);
+	// // Custom Adrenaline command: if apitype == 0xDEAD, write the loaded game file path to a file and return
+	// if (apitype == 0xDEAD) {
+	// 	const char* game_path = param && param->argp ? param->argp : file;
+	// 	pspDebugScreenPrintf("[RA DEBUG] Custom command: writing game path to ux0:/data/loaded_game_path.txt\n");
+	// 	pspDebugScreenPrintf("[RA DEBUG] Game path: %s\n", game_path);
+	// 	SceIoStat stat;
+	// 	if (sceIoGetstat("ux0:/data", &stat) < 0) {
+	// 		int mkres = sceIoMkdir("ux0:/data", 0777);
+	// 		pspDebugScreenPrintf("[RA DEBUG] mkdir ux0:/data result: %d\n", mkres);
+	// 	}
+	// 	SceUID fd = sceIoOpen("ux0:/data/loaded_game_path.txt", PSP_O_WRONLY | PSP_O_CREAT | PSP_O_TRUNC, 0666);
+	// 	pspDebugScreenPrintf("[RA DEBUG] fd: %d\n", fd);
+	// 	if (fd >= 0) {
+	// 		sceIoWrite(fd, game_path, strlen(game_path));
+	// 		sceIoClose(fd);
+	// 		pspDebugScreenPrintf("[RA DEBUG] Successfully wrote game path.\n");
+	// 	} else {
+	// 		pspDebugScreenPrintf("[RA DEBUG] Failed to open file for writing!\n");
+	// 	}
+	// 	pspSdkSetK1(k1);
+	// 	return 0;
+	// }
 
 	VshCtrlSetUmdFile("");
 

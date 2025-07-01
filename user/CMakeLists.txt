@@ -62,6 +62,9 @@ file(GLOB RCHEEVOS_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/rcheevos/src/rhash/*.c
 )
 
+# Ensure RC_CLIENT_SUPPORTS_HASH is defined so rcheevos hash support is enabled
+add_definitions(-DRC_CLIENT_SUPPORTS_HASH)
+
 add_executable(adrenaline_user
   ${cef_res}
   main.c

@@ -16,6 +16,8 @@ void net_term(void);
 void httpInit(void);
 void httpTerm(void);
 int start(void);
+void load_game(const uint8_t* rom, size_t rom_size);
+void load_game_from_file(const char* path);
 
 #ifdef __cplusplus
 }

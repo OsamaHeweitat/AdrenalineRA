@@ -86,7 +86,7 @@ static void test_process_fetch_achievement_info_response() {
   rc_api_achievement_awarded_entry_t* entry;
   const char* server_response = "{\"Success\":true,\"AchievementID\":1234,\"Response\":{"
 	  "\"NumEarned\":17,\"GameID\":2345,\"TotalPlayers\":25,"
-	  "\"RecentWinner\":[{\"User\":\"Player1\",\"DateAwarded\":1615654895},"
+	  "\"RecentWinner\":[{\"User\":\"Player1\",\"DateAwarded\":1615654895,\"AvatarUrl\":\"http://host/UserPic/PLAYER1.png\"},"
                         "{\"User\":\"Player2\",\"DateAwarded\":1600604303}]"
 	  "}}";
 
@@ -104,9 +104,11 @@ static void test_process_fetch_achievement_info_response() {
   entry = &fetch_achievement_info_response.recently_awarded[0];
   ASSERT_STR_EQUALS(entry->username, "Player1");
   ASSERT_NUM_EQUALS(entry->awarded, 1615654895);
+  ASSERT_STR_EQUALS(entry->avatar_url, "http://host/UserPic/PLAYER1.png");
   entry = &fetch_achievement_info_response.recently_awarded[1];
   ASSERT_STR_EQUALS(entry->username, "Player2");
   ASSERT_NUM_EQUALS(entry->awarded, 1600604303);
+  ASSERT_STR_EQUALS(entry->avatar_url, "https://media.retroachievements.org/UserPic/Player2.png");
 
   rc_api_destroy_fetch_achievement_info_response(&fetch_achievement_info_response);
 }
@@ -186,7 +188,7 @@ static void test_process_fetch_leaderboard_info_response() {
 	  "\"LowerIsBetter\":1,\"LBTitle\":\"Title\",\"LBDesc\":\"Description\",\"LBFormat\":\"TIME\","
 	  "\"LBMem\":\"STA:0xH0000=1::CAN:1=1::SUB:0xH0000=2::VAL:b0x 0004\",\"LBAuthor\":null,"
 	  "\"LBCreated\":\"2013-10-20 22:12:21\",\"LBUpdated\":\"2021-06-14 08:18:19\",\"TotalEntries\":12,"
-	  "\"Entries\":[{\"User\":\"Player1\",\"Score\":8765,\"Rank\":1,\"Index\":5,\"DateSubmitted\":1615654895},"
+	  "\"Entries\":[{\"User\":\"Player1\",\"Score\":8765,\"Rank\":1,\"Index\":5,\"DateSubmitted\":1615654895,\"AvatarUrl\":\"http://host/UserPic/PLAYER1.png\"},"
                    "{\"User\":\"Player2\",\"Score\":7654,\"Rank\":2,\"Index\":6,\"DateSubmitted\":1600604303}]"
 	  "}}";
 
@@ -213,12 +215,14 @@ static void test_process_fetch_leaderboard_info_response() {
   ASSERT_STR_EQUALS(entry->username, "Player1");
   ASSERT_NUM_EQUALS(entry->score, 8765);
   ASSERT_NUM_EQUALS(entry->submitted, 1615654895);
+  ASSERT_STR_EQUALS(entry->avatar_url, "http://host/UserPic/PLAYER1.png");
   entry = &fetch_leaderboard_info_response.entries[1];
   ASSERT_NUM_EQUALS(entry->rank, 2);
   ASSERT_NUM_EQUALS(entry->index, 6);
   ASSERT_STR_EQUALS(entry->username, "Player2");
   ASSERT_NUM_EQUALS(entry->score, 7654);
   ASSERT_NUM_EQUALS(entry->submitted, 1600604303);
+  ASSERT_STR_EQUALS(entry->avatar_url, "https://media.retroachievements.org/UserPic/Player2.png");
 
   rc_api_destroy_fetch_leaderboard_info_response(&fetch_leaderboard_info_response);
 }
@@ -421,6 +425,77 @@ static void test_process_fetch_game_titles_response() {
   rc_api_destroy_fetch_game_titles_response(&fetch_game_titles_response);
 }
 
+static void test_init_fetch_hash_library_request() {
+  rc_api_fetch_hash_library_request_t fetch_hash_library_request;
+  rc_api_request_t request;
+
+  memset(&fetch_hash_library_request, 0, sizeof(fetch_hash_library_request));
+  fetch_hash_library_request.console_id = 1;
+
+  ASSERT_NUM_EQUALS(rc_api_init_fetch_hash_library_request(&request, &fetch_hash_library_request), RC_OK);
+  ASSERT_STR_EQUALS(request.url, DOREQUEST_URL);
+  ASSERT_STR_EQUALS(request.post_data, "r=hashlibrary&c=1");
+  ASSERT_STR_EQUALS(request.content_type, RC_CONTENT_TYPE_URLENCODED);
+
+  rc_api_destroy_request(&request);
+}
+
+static void test_process_fetch_hash_library_response() {
+  rc_api_fetch_hash_library_response_t fetch_hash_library_response;
+  rc_api_server_response_t fetch_hash_library_server_response;
+  rc_api_hash_library_entry_t* entry;
+  const char* server_response = "{\"Success\":true,\"MD5List\":{"
+    "\"aabbccddeeff00112233445566778899\":1,"
+    "\"99aabbccddeeff001122334455667788\":1,"
+    "\"8899aabbccddeeff0011223344556677\":2"
+    "}}";
+
+  memset(&fetch_hash_library_server_response, 0, sizeof(fetch_hash_library_server_response));
+  fetch_hash_library_server_response.body = server_response;
+  fetch_hash_library_server_response.body_length = strlen(server_response);
+  fetch_hash_library_server_response.http_status_code = 200;
+
+  memset(&fetch_hash_library_response, 0, sizeof(fetch_hash_library_response));
+
+  ASSERT_NUM_EQUALS(rc_api_process_fetch_hash_library_server_response(&fetch_hash_library_response, &fetch_hash_library_server_response), RC_OK);
+  ASSERT_NUM_EQUALS(fetch_hash_library_response.response.succeeded, 1);
+  ASSERT_PTR_NULL(fetch_hash_library_response.response.error_message);
+  ASSERT_NUM_EQUALS(fetch_hash_library_response.num_entries, 3);
+
+  entry = &fetch_hash_library_response.entries[0];
+  ASSERT_NUM_EQUALS(entry->game_id, 1);
+  ASSERT_STR_EQUALS(entry->hash, "aabbccddeeff00112233445566778899");
+  entry = &fetch_hash_library_response.entries[1];
+  ASSERT_NUM_EQUALS(entry->game_id, 1);
+  ASSERT_STR_EQUALS(entry->hash, "99aabbccddeeff001122334455667788");
+  entry = &fetch_hash_library_response.entries[2];
+  ASSERT_NUM_EQUALS(entry->game_id, 2);
+  ASSERT_STR_EQUALS(entry->hash, "8899aabbccddeeff0011223344556677");
+
+  rc_api_destroy_fetch_hash_library_response(&fetch_hash_library_response);
+}
+
+static void test_process_fetch_hash_library_empty_response() {
+  rc_api_fetch_hash_library_response_t fetch_hash_library_response;
+  rc_api_server_response_t fetch_hash_library_server_response;
+  const char* server_response = "{\"Success\":true,\"MD5List\":[]}"; /* RAWeb returns a list instead of a map for invalid console */
+
+  memset(&fetch_hash_library_server_response, 0, sizeof(fetch_hash_library_server_response));
+  fetch_hash_library_server_response.body = server_response;
+  fetch_hash_library_server_response.body_length = strlen(server_response);
+  fetch_hash_library_server_response.http_status_code = 200;
+
+  memset(&fetch_hash_library_response, 0, sizeof(fetch_hash_library_response));
+
+  ASSERT_NUM_EQUALS(rc_api_process_fetch_hash_library_server_response(&fetch_hash_library_response, &fetch_hash_library_server_response), RC_OK);
+  ASSERT_NUM_EQUALS(fetch_hash_library_response.response.succeeded, 1);
+  ASSERT_PTR_NULL(fetch_hash_library_response.response.error_message);
+  ASSERT_PTR_NULL(fetch_hash_library_response.entries);
+  ASSERT_NUM_EQUALS(fetch_hash_library_response.num_entries, 0);
+
+  rc_api_destroy_fetch_hash_library_response(&fetch_hash_library_response);
+}
+
 void test_rapi_info(void) {
   TEST_SUITE_BEGIN();
 
@@ -451,6 +526,12 @@ void test_rapi_info(void) {
   TEST(test_init_fetch_game_titles_request);
 
   TEST(test_process_fetch_game_titles_response);
+
+  /* hash library */
+  TEST(test_init_fetch_hash_library_request);
+
+  TEST(test_process_fetch_hash_library_response);
+  TEST(test_process_fetch_hash_library_empty_response);
 
   TEST_SUITE_END();
 }

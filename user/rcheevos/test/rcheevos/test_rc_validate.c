@@ -137,6 +137,11 @@ static void test_addhits_chain_without_target() {
   TEST_PARAMS2(test_validate_trigger, "D:0xH1234=1_0xH2345=2", "Condition 2: Final condition in AddHits chain must have a hit target");
   TEST_PARAMS2(test_validate_trigger, "C:0xH1234=1_0xH2345=2.1.", "");
   TEST_PARAMS2(test_validate_trigger, "D:0xH1234=1_0xH2345=2.1.", "");
+
+  /* ResetIf at the end of a hit chain does not require a hit target.
+   * It's meant to reset things if some subset of conditions have been true. */
+  TEST_PARAMS2(test_validate_trigger, "C:0xH1234=1_C:0xH2345=2_R:0=1.1.", "");
+  TEST_PARAMS2(test_validate_trigger, "C:0xH1234=1_C:0xH2345=2_R:0=1", "");
 }
 
 static void test_range_comparisons() {
@@ -201,6 +206,8 @@ static void test_range_comparisons() {
   /* max for SubSource is always 0xFFFFFFFF */
   TEST_PARAMS2(test_validate_trigger, "B:0xH1234_0xH1235<510", "");
   TEST_PARAMS2(test_validate_trigger, "B:0xH1234_0xH1235<=510", "");
+
+  TEST_PARAMS2(test_validate_trigger, "I:0xG1234&536870911_R:0xG0000=4294967294", "");
 }
 
 void test_size_comparisons() {
@@ -220,6 +227,7 @@ void test_address_range() {
   TEST_PARAMS2(test_validate_trigger_64k, "0xH1234>0xH12345", "Condition 1: Address 12345 out of range (max FFFF)");
   TEST_PARAMS2(test_validate_trigger_64k, "0xH12345>0xH12345", "Condition 1: Address 12345 out of range (max FFFF)");
   TEST_PARAMS2(test_validate_trigger_64k, "0xX1234>h12345", "");
+  TEST_PARAMS2(test_validate_trigger_64k, "K:0xX1234&1073741823_K:0xX2345+{recall}_0=1", "");
 
   /* support for multiple memory blocks and edge addresses */
   TEST_PARAMS2(test_validate_trigger_128k, "0xH1234>0xH1235", "");
@@ -231,6 +239,7 @@ void test_address_range() {
   /* AddAddress can use really big values for negative offsets, don't flag them. */
   TEST_PARAMS2(test_validate_trigger_128k, "I:0xX1234_0xHFFFFFF00>5", "");
   TEST_PARAMS2(test_validate_trigger_128k, "I:0xX1234_0xH1234>5_0xHFFFFFF00>5", "Condition 3: Address FFFFFF00 out of range (max 1FFFF)");
+  TEST_PARAMS2(test_validate_trigger_128k, "I:0xX1234_0xHFFFFFF00*2>5", "");
 
   /* console-specific warnings */
   TEST_PARAMS3(test_validate_trigger_console, "0xH0123>23", "", RC_CONSOLE_NINTENDO);
@@ -269,6 +278,16 @@ void test_delta_pointers() {
   TEST_PARAMS2(test_validate_trigger, "I:0xX1234_I:0xH0010_0xH0000=1", "");
 }
 
+void test_nonsized_pointers() {
+  TEST_PARAMS2(test_validate_trigger, "I:Ff1234_0xH0000=1", "Condition 1: Using non-integer value in AddAddress calcuation");
+  TEST_PARAMS2(test_validate_trigger, "I:Fb1234_0xH0000=1", "Condition 1: Using non-integer value in AddAddress calcuation");
+  TEST_PARAMS2(test_validate_trigger, "I:Fm1234_0xH0000=1", "Condition 1: Using non-integer value in AddAddress calcuation");
+  TEST_PARAMS2(test_validate_trigger, "I:Fh1234_0xH0000=1", "Condition 1: Using non-integer value in AddAddress calcuation");
+  TEST_PARAMS2(test_validate_trigger, "I:0xH1234*f1.5_0xH0000=1", "Condition 1: Using non-integer value in AddAddress calcuation");
+  TEST_PARAMS2(test_validate_trigger, "I:b0xH1234_0xH0000=1", "Condition 1: Using transformed value in AddAddress calcuation");
+  TEST_PARAMS2(test_validate_trigger, "I:~0xH1234_0xH0000=1", "Condition 1: Using transformed value in AddAddress calcuation");
+}
+
 void test_float_comparisons() {
   TEST_PARAMS2(test_validate_trigger, "fF1234=f2.3", "");
   TEST_PARAMS2(test_validate_trigger, "fM1234=f2.3", "");
@@ -288,7 +307,7 @@ void test_float_comparisons() {
   TEST_PARAMS2(test_validate_trigger, "f2.0=0xX1234", "");
   TEST_PARAMS2(test_validate_trigger, "A:Ff2345_fF1234=f2.3", "");
   TEST_PARAMS2(test_validate_trigger, "A:0xX2345_fF1234=f2.3", "");
-  TEST_PARAMS2(test_validate_trigger, "A:Ff2345_0x1234=f2.3", "");
+  TEST_PARAMS2(test_validate_trigger, "A:Ff2345_0x1234=f2.3", "Condition 2: Comparison is never true"); /* non integral comparison */
   TEST_PARAMS2(test_validate_trigger, "fM1234>f2.3", "");
   TEST_PARAMS2(test_validate_trigger, "fM1234>f-2.3", "");
   TEST_PARAMS2(test_validate_trigger, "I:0xX2345_fM1234>f1.0", "");
@@ -316,6 +335,8 @@ void test_conflicting_conditions() {
   TEST_PARAMS2(test_validate_trigger, "O:0xH0000<5_0xH0000=5", ""); /* ignore combining conditions */
   TEST_PARAMS2(test_validate_trigger, "A:0xH0000<5_0xH0000=5", ""); /* ignore combining conditions */
   TEST_PARAMS2(test_validate_trigger, "N:0xH0000<5_R:0xH0001=8_T:0xH0000=0", ""); /* ignore combining conditions */
+  TEST_PARAMS2(test_validate_trigger, "T:0xH0000=8_N:d0xH0000=0_R:0xH0000=8", ""); /* ignore combining conditions - individually, third conditions is conflicting (second allowed because of delta) */
+  TEST_PARAMS2(test_validate_trigger, "0xH0001=58_N:0xH0001!=58_N:0xH0001!=4_R:0xH0001!=18", ""); /* ignore combining conditions */
   TEST_PARAMS2(test_validate_trigger, "0xH0000<=5_0xH0000>=5", "");
   TEST_PARAMS2(test_validate_trigger, "0xH0000>1_0xH0000<3", "");
   TEST_PARAMS2(test_validate_trigger, "1=1S0xH0000=1S0xH0000=2", "");
@@ -354,6 +375,7 @@ void test_conflicting_conditions() {
   TEST_PARAMS2(test_validate_trigger, "N:0xH0000=1_0xH0001=1_N:0xH0000=2_0xH0001=2", "");
   TEST_PARAMS2(test_validate_trigger, "N:0xH0000=1_0xH0001=1_N:0xH0000=2_0xH0001=1", ""); /* technically conflicting, but hard to detect */
   TEST_PARAMS2(test_validate_trigger, "N:0xH0000=1_0xH0001=1_N:0xH0000=1_0xH0001=2", "Condition 4: Conflicts with Condition 2");
+  TEST_PARAMS2(test_validate_trigger, "0xH0000=0_N:0xH0000!=0_0xH0000=2", "");
 }
 
 void test_redundant_conditions() {
@@ -362,6 +384,7 @@ void test_redundant_conditions() {
   TEST_PARAMS2(test_validate_trigger, "0xH0000<5_0xH0000<3", "Condition 1: Redundant with Condition 2");
   TEST_PARAMS2(test_validate_trigger, "0xH0000=1S0xH0000=1", "Alt1 Condition 1: Redundant with Core Condition 1");
   TEST_PARAMS2(test_validate_trigger, "R:0xH0000=1_0xH0000!=1", "Condition 2: Redundant with Condition 1");
+  TEST_PARAMS2(test_validate_trigger, "R:0xH0000!=1_0xH0000!=0", "Condition 2: Redundant with Condition 1"); /* condition 1 effectively 0xH0000=1 */
   TEST_PARAMS2(test_validate_trigger, "R:0xH0000=1_0xH0000=2", "");
   TEST_PARAMS2(test_validate_trigger, "R:0xH0000=1_T:0xH0000=2", "");
   TEST_PARAMS2(test_validate_trigger, "0xH0000=1_R:0xH0000!=1", "Condition 1: Redundant with Condition 2");
@@ -383,7 +406,9 @@ void test_redundant_conditions() {
   TEST_PARAMS2(test_validate_trigger, "A:0xX0004_Q:0xH0000=1_A:0xX0004_A:0xX0008_Q:0xH0000=1", ""); /* longer second chain */
   TEST_PARAMS2(test_validate_trigger, "Q:0xH0000=1SQ:0xH0000=1", ""); /* same measuredif can appear in different groups */
   TEST_PARAMS2(test_validate_trigger, "T:0xH0000!=0_T:0xH0000=6", "Condition 1: Redundant with Condition 2");
-  TEST_PARAMS2(test_validate_trigger, "0xH0000!=0_T:0xH0000=6", ""); /* trigger not redundant with non-trigger */
+  TEST_PARAMS2(test_validate_trigger, "0xH0000!=0_T:0xH0000=6", ""); /* trigger more restrictive than non-trigger */
+  TEST_PARAMS2(test_validate_trigger, "T:0xH0000!=0_0xH0000=6", "Condition 1: Redundant with Condition 2"); /* trigger less restrictive than non-trigger */
+  TEST_PARAMS2(test_validate_trigger, "0xH0000=6_T:0xH0000=6", "Condition 2: Redundant with Condition 1"); /* trigger same as non-trigger */
   TEST_PARAMS2(test_validate_trigger, "0xH0000=1_Q:0xH0000=1", "Condition 1: Redundant with Condition 2");
   TEST_PARAMS2(test_validate_trigger, "0xH0000=1S0xH0000!=0S0xH0001=2", "Alt1 Condition 1: Redundant with Core Condition 1");
   TEST_PARAMS2(test_validate_trigger, "0xH0000!=0S0xH0000=1S0xH0001=2", ""); /* more restrictive alt 1 is not redundant with core */
@@ -413,7 +438,7 @@ void test_remember_recall_errors() {
   TEST_PARAMS2(test_validate_trigger, "{recall}=5_K:0xH1234&1023_K:{recall}*8_{recall}=100", "Condition 1: Recall used before Remember"); /* First remember is after first recall. */
   TEST_PARAMS2(test_validate_trigger, "K:0xH1234&1023_K:{recall}*8_{recall}=100", ""); /* Recall used after Remember */
   TEST_PARAMS2(test_validate_trigger, "{recall}=5_K:0xH1234*2_P:{recall}>6", ""); /* Remember sets recall in pause - no warning */
-  TEST_PARAMS2(test_validate_trigger, "K:0xH1234*2_{recall}=5_P:{recall}>6", "Condition 3: Recall used in Pause processing before Remember was used in Pause processing"); /* Pause happens before remembered value. */
+  TEST_PARAMS2(test_validate_trigger, "K:0xH1234*2_{recall}=5_P:{recall}>6", "Condition 3: Recall used before Remember"); /* Pause happens before remembered value. */
 }
 
 void test_rc_validate(void) {
@@ -429,6 +454,7 @@ void test_rc_validate(void) {
   test_size_comparisons();
   test_address_range();
   test_delta_pointers();
+  test_nonsized_pointers();
   test_float_comparisons();
   test_conflicting_conditions();
   test_redundant_conditions();

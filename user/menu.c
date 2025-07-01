@@ -217,26 +217,6 @@ void ascii2utf(uint16_t* dst, char* src){
 }
 
 static int TestNotification() {
-  int res = -1;
-
-
-  res = sceSysmoduleLoadModule(SCE_SYSMODULE_NOTIFICATION_UTIL);
-
-
-
-
-  if ( res != 0 ) {
-      sceClibPrintf("sceSysmoduleLoadModule notif: 0x%08x\n", res);
-  }
-  else
-  {
-    SceNotificationUtilProgressFinishParam param;
-    memset(&param,0,sizeof(SceNotificationUtilProgressFinishParam));
-    ascii2utf(param.notificationText,"hi there");
-    sceNotificationUtilSendNotification (param.notificationText);
-    sceSysmoduleUnloadModule(SCE_SYSMODULE_NOTIFICATION_UTIL);
-  }
-
   start();
 
   return 0;

@@ -11,6 +11,8 @@
 #include <psp2/net/netctl.h>
 #include <psp2/net/http.h>
 #include <psp2/libssl.h>
+#include <psp2/notificationutil.h> 
+
 
 rc_client_t* g_client = NULL;
 
@@ -168,6 +170,10 @@ static void http_callback(int status_code, const char* content, size_t content_s
       server_response.http_status_code = RC_API_SERVER_RESPONSE_RETRYABLE_CLIENT_ERROR;
   }
 
+  sceClibPrintf("[RA DEBUG] http_callback: status=%d\n", server_response.http_status_code);
+  sceClibPrintf("[RA DEBUG] http_callback: body_length=%d\n", (int)server_response.body_length);
+  sceClibPrintf("[RA DEBUG] http_callback: body=%s\n", server_response.body);
+
   // Get the rc_client callback and call it
   async_callback_data* async_data = (async_callback_data*)userdata;
   async_data->callback(&server_response, async_data->callback_data);
@@ -235,16 +241,42 @@ static void login_callback(int result, const char* error_message, rc_client_t* c
   // If not successful, just report the error and bail.
   if (result != RC_OK)
   {
-    show_message("Login failed: %s", error_message);
+    sceClibPrintf("Login failed: %s\n", error_message);
     return;
   }
 
   // Login was successful. Capture the token for future logins so we don't have to store the password anywhere.
   const rc_client_user_t* user = rc_client_get_user_info(client);
+  
+  sceClibPrintf("[RA DEBUG] login_callback: user pointer=%p\n", user);
+  if (user) {
+    sceClibPrintf("[RA DEBUG] login_callback: username=%s\n", user->username);
+    sceClibPrintf("[RA DEBUG] login_callback: display_name=%s\n", user->display_name);
+    sceClibPrintf("[RA DEBUG] login_callback: score=%u\n", user->score);
+  } else {
+    sceClibPrintf("[RA DEBUG] login_callback: user is NULL\n");
+  }
+  
   // store_retroachievements_credentials(user->username, user->token);
 
   // Inform user of successful login
-  show_message("Logged in as %s (%u points)", user->display_name, user->score);
+  char login_msg[128];
+  snprintf(login_msg, sizeof(login_msg), "Logged in as %s (%u points)\n", user->display_name, user->score);
+  sceClibPrintf("%s", login_msg);
+
+  int res = -1;
+  res = sceSysmoduleLoadModule(SCE_SYSMODULE_NOTIFICATION_UTIL);
+  if ( res != 0 ) {
+      sceClibPrintf("sceSysmoduleLoadModule notif: 0x%08x\n", res);
+  }
+  else
+  {
+    SceNotificationUtilProgressFinishParam param;
+    memset(&param,0,sizeof(SceNotificationUtilProgressFinishParam));
+    ascii2utf(param.notificationText,login_msg);
+    sceNotificationUtilSendNotification (param.notificationText);
+    sceSysmoduleUnloadModule(SCE_SYSMODULE_NOTIFICATION_UTIL);
+  }
 }
 
 void login_retroachievements_user(const char* username, const char* password)

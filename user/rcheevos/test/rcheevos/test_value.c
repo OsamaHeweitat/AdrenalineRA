@@ -106,6 +106,76 @@ static void test_evaluate_measured_value_with_pause() {
   ASSERT_NUM_EQUALS(rc_evaluate_value(self, peek, &memory, NULL), 2);
 }
 
+static void test_evaluated_and_next_measured_if_value() {
+  rc_value_t* self;
+  const rc_condition_t* cond2;
+  const rc_condition_t* cond4;
+  uint8_t ram[] = {0x00, 0x12, 0x34, 0xAB, 0x56};
+  memory_t memory;
+  char buffer[2048];
+  const char* memaddr = "R:0xH0004=1_N:0xH0000=1.1._N:d0xH0000=9_Q:0xH0000=0.1._M:100";
+  int ret;
+
+  memory.ram = ram;
+  memory.size = sizeof(ram);
+
+  ret = rc_value_size(memaddr);
+  ASSERT_NUM_GREATER_EQUALS(ret, 0);
+
+  self = rc_parse_value(buffer, memaddr, NULL, 0);
+  ASSERT_PTR_NOT_NULL(self);
+
+  cond2 = self->conditions->conditions->next;
+  cond4 = cond2->next->next;
+
+  /* measured if cannot be true */
+  ASSERT_NUM_EQUALS(rc_evaluate_value(self, peek, &memory, NULL), 0);
+  ASSERT_NUM_EQUALS(cond2->current_hits, 0);
+  ASSERT_NUM_EQUALS(cond4->current_hits, 0);
+
+  /* capture first hit, measured_if still not true */
+  ram[0] = 1;
+  ASSERT_NUM_EQUALS(rc_evaluate_value(self, peek, &memory, NULL), 0);
+  ASSERT_NUM_EQUALS(cond2->current_hits, 1);
+  ASSERT_NUM_EQUALS(cond4->current_hits, 0);
+
+  /* reset */
+  ram[4] = 1;
+  ASSERT_NUM_EQUALS(rc_evaluate_value(self, peek, &memory, NULL), 0);
+  ASSERT_NUM_EQUALS(cond2->current_hits, 0);
+  ASSERT_NUM_EQUALS(cond4->current_hits, 0);
+
+  /* clear reset */
+  ram[4] = 0;
+  ASSERT_NUM_EQUALS(rc_evaluate_value(self, peek, &memory, NULL), 0);
+  ASSERT_NUM_EQUALS(cond2->current_hits, 1);
+  ASSERT_NUM_EQUALS(cond4->current_hits, 0);
+
+  /* prime measured_if */
+  ram[0] = 9;
+  ASSERT_NUM_EQUALS(rc_evaluate_value(self, peek, &memory, NULL), 0);
+  ASSERT_NUM_EQUALS(cond2->current_hits, 1);
+  ASSERT_NUM_EQUALS(cond4->current_hits, 0);
+
+  /* trigger measured if */
+  ram[0] = 0;
+  ASSERT_NUM_EQUALS(rc_evaluate_value(self, peek, &memory, NULL), 100);
+  ASSERT_NUM_EQUALS(cond2->current_hits, 1);
+  ASSERT_NUM_EQUALS(cond4->current_hits, 1);
+
+  /* measured if should remain triggered */
+  ram[0] = 1;
+  ASSERT_NUM_EQUALS(rc_evaluate_value(self, peek, &memory, NULL), 100);
+  ASSERT_NUM_EQUALS(cond2->current_hits, 1);
+  ASSERT_NUM_EQUALS(cond4->current_hits, 1);
+
+  /* reset */
+  ram[4] = 1;
+  ASSERT_NUM_EQUALS(rc_evaluate_value(self, peek, &memory, NULL), 0);
+  ASSERT_NUM_EQUALS(cond2->current_hits, 0);
+  ASSERT_NUM_EQUALS(cond4->current_hits, 0);
+}
+
 static void test_evaluate_measured_value_with_reset() {
   rc_value_t* self;
   uint8_t ram[] = {0x00, 0x12, 0x34, 0xAB, 0x56};
@@ -284,7 +354,10 @@ static void test_typed_value_add(uint8_t type, uint32_t u32, double f32,
 
   rc_typed_value_add(&value, &amount);
 
-  if (type == RC_VALUE_TYPE_NONE) {
+  if (result_f32 != 0.0) {
+    assert_typed_value(&value, RC_VALUE_TYPE_FLOAT, result_u32, result_f32);
+  }
+  else if (type == RC_VALUE_TYPE_NONE) {
     assert_typed_value(&value, amount_type, result_u32, result_f32);
   }
   else {
@@ -304,20 +377,20 @@ static void test_typed_value_addition() {
 
   /* unsigned source */
   TEST_PARAMS8(test_typed_value_add, RC_VALUE_TYPE_UNSIGNED, 6, 0.0, RC_VALUE_TYPE_UNSIGNED, 8, 0.0, 14, 0.0);
-  TEST_PARAMS8(test_typed_value_add, RC_VALUE_TYPE_UNSIGNED, 6, 0.0, RC_VALUE_TYPE_FLOAT, 0, 8.0, 14, 0.0);
+  TEST_PARAMS8(test_typed_value_add, RC_VALUE_TYPE_UNSIGNED, 6, 0.0, RC_VALUE_TYPE_FLOAT, 0, 8.0, 0, 14.0);
 
   TEST_PARAMS8(test_typed_value_add, RC_VALUE_TYPE_UNSIGNED, 6, 0.0, RC_VALUE_TYPE_UNSIGNED, 0xFFFFFFFE, 0.0, 4, 0.0);
   TEST_PARAMS8(test_typed_value_add, RC_VALUE_TYPE_UNSIGNED, 6, 0.0, RC_VALUE_TYPE_SIGNED, (unsigned)-2, 0.0, 4, 0.0);
-  TEST_PARAMS8(test_typed_value_add, RC_VALUE_TYPE_UNSIGNED, 6, 0.0, RC_VALUE_TYPE_FLOAT, 0, -2.0, 4, 0.0);
+  TEST_PARAMS8(test_typed_value_add, RC_VALUE_TYPE_UNSIGNED, 6, 0.0, RC_VALUE_TYPE_FLOAT, 0, -2.0, 0, 4.0);
   TEST_PARAMS8(test_typed_value_add, RC_VALUE_TYPE_UNSIGNED, 6, 0.0, RC_VALUE_TYPE_NONE, 0, 0.0, 6, 0.0);
 
   /* signed source */
   TEST_PARAMS8(test_typed_value_add, RC_VALUE_TYPE_SIGNED, (unsigned)-6, 0.0, RC_VALUE_TYPE_UNSIGNED, 2, 0.0, (unsigned)-4, 0.0);
-  TEST_PARAMS8(test_typed_value_add, RC_VALUE_TYPE_SIGNED, (unsigned)-6, 0.0, RC_VALUE_TYPE_FLOAT, 0, 2.0, (unsigned)-4, 0.0);
+  TEST_PARAMS8(test_typed_value_add, RC_VALUE_TYPE_SIGNED, (unsigned)-6, 0.0, RC_VALUE_TYPE_FLOAT, 0, 2.0, 0, -4.0);
 
   TEST_PARAMS8(test_typed_value_add, RC_VALUE_TYPE_SIGNED, (unsigned)-6, 0.0, RC_VALUE_TYPE_UNSIGNED, 8, 0.0, 2, 0.0);
   TEST_PARAMS8(test_typed_value_add, RC_VALUE_TYPE_SIGNED, (unsigned)-6, 0.0, RC_VALUE_TYPE_SIGNED, (unsigned)-2, 0.0, (unsigned)-8, 0.0);
-  TEST_PARAMS8(test_typed_value_add, RC_VALUE_TYPE_SIGNED, (unsigned)-6, 0.0, RC_VALUE_TYPE_FLOAT, 0, 2.0, (unsigned)-4, 0.0);
+  TEST_PARAMS8(test_typed_value_add, RC_VALUE_TYPE_SIGNED, (unsigned)-6, 0.0, RC_VALUE_TYPE_FLOAT, 0, 2.0, 0, -4.0);
   TEST_PARAMS8(test_typed_value_add, RC_VALUE_TYPE_SIGNED, (unsigned)-6, 0.0, RC_VALUE_TYPE_NONE, 0, 0.0, (unsigned)-6, 0.0);
 
   /* float source (whole numbers) */
@@ -551,8 +624,9 @@ void test_value(void) {
   TEST_PARAMS2(test_evaluate_value, "0xH0001*100_0xH0002*0.5_0xL0003", 0x12 * 100 + 0x34 / 2 + 0x0B);
   TEST_PARAMS2(test_evaluate_value, "0xH0001$0xH0002", 0x34);
   TEST_PARAMS2(test_evaluate_value, "0xH0001_0xH0004*3$0xH0002*0xL0003", 0x34 * 0x0B);
-  TEST_PARAMS2(test_evaluate_value, "0xH001_V-20", 0x12 - 20);
+  TEST_PARAMS2(test_evaluate_value, "0xH0001_V-20", 0x12 - 20);
   TEST_PARAMS2(test_evaluate_value, "0xH0001_H10", 0x12 + 0x10);
+  TEST_PARAMS2(test_evaluate_value, "100-0xH0002", 100 - 0x34);
   TEST_PARAMS2(test_evaluate_value, "0xh0000*-1_99_0xh0001*-100_5900", 4199);
   TEST_PARAMS2(test_evaluate_value, "v5900_0xh0000*-1.0_0xh0001*-100.0", 4100);
   TEST_PARAMS2(test_evaluate_value, "v5900_0xh0000*v-1_0xh0001*v-100", 4100);
@@ -568,6 +642,7 @@ void test_value(void) {
   TEST_PARAMS2(test_evaluate_value, "B0xH01", 12);
   TEST_PARAMS2(test_evaluate_value, "B0x00001", 3412);
   TEST_PARAMS2(test_evaluate_value, "B0xH03", 111); /* 0xAB not really BCD */
+  TEST_PARAMS2(test_evaluate_value, "B0xW00", 341200);
 
   /* non-comparison measured values just return the value at the address and have no target */
   TEST_PARAMS2(test_measured_value_target, "M:0xH0002", 0);
@@ -621,9 +696,10 @@ void test_value(void) {
   /* delta should initially be 0, so a hit will be tallied */
   TEST_PARAMS2(test_evaluate_value, "M:0xH0002!=d0xH0002", 1);
 
-  /* division (cannot occur directly on measured condition, so use AddSource) */
+  /* division */
   TEST_PARAMS2(test_evaluate_value, "A:0xH0001/2_M:0", 9);       /* 18/2 = 9 */
   TEST_PARAMS2(test_evaluate_value, "A:0xH0001/5_M:0", 3);       /* 18/5 = 3 */
+  TEST_PARAMS2(test_evaluate_value, "M:0xH0001/5", 3);           /* 18/5 = 3 */
   TEST_PARAMS2(test_evaluate_value, "A:0xH0002/0xH0001_M:0", 2); /* 52/18 = 2 */
   TEST_PARAMS2(test_evaluate_value, "A:0xH0001/0xH0002_M:0", 0); /* 18/52 = 0 */
   TEST_PARAMS2(test_evaluate_value, "A:0xH0001/0xH0001_M:0", 1); /* 18/18 = 1 */
@@ -675,6 +751,7 @@ void test_value(void) {
   TEST_PARAMS2(test_evaluate_value, "Q:0xH0001!=0_M:0xH0002", 0x34);
   TEST_PARAMS2(test_evaluate_value, "Q:0xH0001=0_M:0xH0002", 0);
   TEST_PARAMS2(test_evaluate_value, "Q:0xH0001!=0_M:1", 1);
+  TEST(test_evaluated_and_next_measured_if_value);
 
   /* using accumulator */
   TEST_PARAMS2(test_evaluate_value, "K:0xH01_M:{recall}", 0x12); /* 18-> recall accumulator, Measurement = 18 */

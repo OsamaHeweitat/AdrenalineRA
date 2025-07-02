@@ -621,6 +621,9 @@ int AdrenalineDraw(SceSize args, void *argp) {
     if (menu_open)
       drawMenu();
 
+    // Draw notification overlay (RA, etc.)
+    draw_vita2d_notification();
+
     // f.lux filter drawing
     if (config.flux_mode != 0) {
       uint8_t flux_idx = (config.flux_mode * 4) - 1;

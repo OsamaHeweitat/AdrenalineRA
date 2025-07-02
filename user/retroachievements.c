@@ -19,8 +19,13 @@
 #include <psp2/kernel/threadmgr.h>
 
 #include "main.h"
+#include "menu.h"
 #include "../adrenaline_compat.h"
 #include <ctype.h>
+
+#include <vita2d.h>
+
+#include <psp2/types.h>
 
 rc_client_t* g_client = NULL;
 
@@ -29,6 +34,31 @@ typedef struct {
     rc_client_server_callback_t callback;
     void* callback_data;
 } async_callback_data;
+
+// --- Notification overlay state ---
+static char g_notification_msg[128] = {0};
+static SceUInt64 g_notification_until = 0;
+
+// Call this from any thread/context to trigger a notification
+void trigger_vita2d_notification(const char* message, unsigned duration_us) {
+    strncpy(g_notification_msg, message, sizeof(g_notification_msg)-1);
+    g_notification_msg[sizeof(g_notification_msg)-1] = '\0';
+    g_notification_until = sceKernelGetProcessTimeWide() + duration_us;
+}
+
+void draw_vita2d_notification(void) {
+    if (g_notification_msg[0] && sceKernelGetProcessTimeWide() < g_notification_until) {
+        float notif_width = 600.0f;
+        float notif_height = 60.0f;
+        float notif_x = (960.0f - notif_width) / 2.0f;
+        float notif_y = 544.0f - notif_height - 40.0f;
+        vita2d_draw_rectangle(notif_x, notif_y, notif_width, notif_height, 0xC0000000);
+        float text_width = vita2d_pgf_text_width(font, 1.0f, g_notification_msg);
+        vita2d_pgf_draw_text(font, notif_x + (notif_width - text_width) / 2.0f, notif_y + 40.0f, 0xFFFFFFFF, 1.0f, g_notification_msg);
+    } else if (g_notification_msg[0]) {
+        g_notification_msg[0] = 0;
+    }
+}
 
 int show_message(const char* message, ...)
 {
@@ -317,6 +347,32 @@ void shutdown_retroachievements_client(void)
   }  
 }
 
+extern vita2d_pgf *font; // Use the global font from menu.c
+
+// void show_vita2d_notification(const char* message) {
+//     sceClibPrintf("show_vita2d_notification: %s\n", message);
+//     // Draw overlay for 2 seconds
+//     SceUInt64 start = sceKernelGetProcessTimeWide();
+//     SceUInt64 now = start;
+//     while (now - start < 2000000) { // 2,000,000 microseconds = 2 seconds
+//         vita2d_start_drawing();
+//         // Optionally: vita2d_clear_screen(); // Don't clear, just overlay
+//         // Draw a semi-transparent black box at the bottom of the screen
+//         float notif_width = 600.0f;
+//         float notif_height = 60.0f;
+//         float notif_x = (960.0f - notif_width) / 2.0f;
+//         float notif_y = 544.0f - notif_height - 40.0f;
+//         vita2d_draw_rectangle(notif_x, notif_y, notif_width, notif_height, 0xC0000000);
+//         // Draw the message centered
+//         float text_width = vita2d_pgf_text_width(font, 1.0f, message);
+//         vita2d_pgf_draw_text(font, notif_x + (notif_width - text_width) / 2.0f, notif_y + 40.0f, 0xFFFFFFFF, 1.0f, message);
+//         vita2d_end_drawing();
+//         vita2d_swap_buffers();
+//         sceKernelDelayThread(16 * 1000); // ~60fps
+//         now = sceKernelGetProcessTimeWide();
+//     }
+// }
+
 static void login_callback(int result, const char* error_message, rc_client_t* client, void* userdata)
 {
   // If not successful, just report the error and bail.
@@ -342,22 +398,11 @@ static void login_callback(int result, const char* error_message, rc_client_t* c
 
   // Inform user of successful login
   char login_msg[128];
-  snprintf(login_msg, sizeof(login_msg), "Logged in as %s (%u points)\n", user->display_name, user->score);
+  snprintf(login_msg, sizeof(login_msg), "Logged in as %s (%u points)", user->display_name, user->score);
   sceClibPrintf("%s", login_msg);
 
-  int res = -1;
-  res = sceSysmoduleLoadModule(SCE_SYSMODULE_NOTIFICATION_UTIL);
-  if ( res != 0 ) {
-      sceClibPrintf("sceSysmoduleLoadModule notif: 0x%08x\n", res);
-  }
-  else
-  {
-    SceNotificationUtilProgressFinishParam param;
-    memset(&param,0,sizeof(SceNotificationUtilProgressFinishParam));
-    ascii2utf(param.notificationText,login_msg);
-    sceNotificationUtilSendNotification (param.notificationText);
-    sceSysmoduleUnloadModule(SCE_SYSMODULE_NOTIFICATION_UTIL);
-  }
+  // Trigger notification (2 seconds)
+  trigger_vita2d_notification(login_msg, 2000000);
 }
 
 void login_retroachievements_user(const char* username, const char* password)
@@ -473,6 +518,48 @@ int load_retroachievements_credentials(char* username, size_t username_size, cha
     return 0;
 }
 
+// static void show_game_placard(void)
+// {
+//   char message[128], url[128];
+//   async_image_data* image_data = NULL;
+//   const rc_client_game_t* game = rc_client_get_game_info(g_client);
+//   rc_client_user_game_summary_t summary;
+//   rc_client_get_user_game_summary(g_client, &summary);
+
+//   // Construct a message indicating the number of achievements unlocked by the user.
+//   if (summary.num_core_achievements == 0)
+//   {
+//     snprintf(message, sizeof(message), "This game has no achievements.");
+//   }
+//   else if (summary.num_unsupported_achievements)
+//   {
+//     snprintf(message, sizeof(message), "You have %u of %u achievements unlocked (%d unsupported).",
+//         summary.num_unlocked_achievements, summary.num_core_achievements,
+//         summary.num_unsupported_achievements);
+//   }
+//   else
+//   {
+//     snprintf(message, sizeof(message), "You have %u of %u achievements unlocked.",
+//         summary.num_unlocked_achievements, summary.num_core_achievements);
+//   }
+
+//   // The emulator is responsible for managing images. This uses rc_client to build
+//   // the URL where the image should be downloaded from.
+//   if (rc_client_game_get_image_url(game, url, sizeof(url)) == RC_OK)
+//   {
+//     // Generate a local filename to store the downloaded image.
+//     char game_badge[64];
+//     snprintf(game_badge, sizeof(game_badge), "game_%s.png", game->badge_name);
+
+//     // This function will download and cache the game image. It is up to the emulator
+//     // to implement this logic. Similarly, the emulator has to use image_data to
+//     // display the game badge in the placard, or a placeholder until the image is
+//     // downloaded. None of that logic is provided in this example.
+//     image_data = download_and_cache_image(game_badge, url);
+//   } 
+
+//   show_popup_message(image_data, game->title, message);
+// }
 
 static void load_game_callback(int result, const char* error_message, rc_client_t* client, void* userdata)
 {

@@ -38,12 +38,185 @@ typedef struct {
 // --- Notification overlay state ---
 static char g_notification_msg[128] = {0};
 static SceUInt64 g_notification_until = 0;
+static vita2d_texture* g_notification_image = NULL; // Optional image for notification
 
-// Call this from any thread/context to trigger a notification
-void trigger_vita2d_notification(const char* message, unsigned duration_us) {
+vita2d_texture* download_image_texture(const char* image_url, const char* cache_filename) {
+    if (!image_url || !image_url[0]) {
+        sceClibPrintf("[RA DEBUG] No image URL provided\n");
+        return NULL;
+    }
+    
+    sceClibPrintf("[RA DEBUG] Downloading image from: %s\n", image_url);
+    
+    // Determine file path - use cache if provided, otherwise temp
+    char file_path[256];
+    if (cache_filename && cache_filename[0]) {
+        snprintf(file_path, sizeof(file_path), "ux0:data/ra_cache/%s", cache_filename);
+        sceIoMkdir("ux0:data/ra_cache", 0777);
+    } else {
+        snprintf(file_path, sizeof(file_path), "ux0:data/ra_temp_image.jpg");
+    }
+    
+    // Check if cached version exists first
+    if (cache_filename && cache_filename[0]) {
+        SceIoStat stat;
+        if (sceIoGetstat(file_path, &stat) >= 0) {
+            sceClibPrintf("[RA DEBUG] Using cached image: %s\n", file_path);
+            vita2d_texture* texture = vita2d_load_JPEG_file(file_path);
+            if (!texture) {
+                texture = vita2d_load_PNG_file(file_path);
+            }
+            if (texture) {
+                return texture;
+            }
+        }
+    }
+    
+    int tpl = sceHttpCreateTemplate("Adrenaline/1.0-debug (PSVita)", 1, 1);
+    if (tpl < 0) {
+        sceClibPrintf("[RA DEBUG] Failed to create HTTP template for image\n");
+        return NULL;
+    }
+    
+    int conn = sceHttpCreateConnectionWithURL(tpl, image_url, 0);
+    if (conn < 0) {
+        sceHttpDeleteTemplate(tpl);
+        sceClibPrintf("[RA DEBUG] Failed to create HTTP connection for image\n");
+        return NULL;
+    }
+    
+    int req = sceHttpCreateRequestWithURL(conn, SCE_HTTP_METHOD_GET, image_url, 0);
+    if (req < 0) {
+        sceHttpDeleteConnection(conn);
+        sceHttpDeleteTemplate(tpl);
+        sceClibPrintf("[RA DEBUG] Failed to create HTTP request for image\n");
+        return NULL;
+    }
+    
+    int res = sceHttpSendRequest(req, NULL, 0);
+    if (res < 0) {
+        sceHttpDeleteRequest(req);
+        sceHttpDeleteConnection(conn);
+        sceHttpDeleteTemplate(tpl);
+        sceClibPrintf("[RA DEBUG] Failed to send HTTP request for image\n");
+        return NULL;
+    }
+    
+    int status_code = 0;
+    sceHttpGetStatusCode(req, &status_code);
+    if (status_code != 200) {
+        sceHttpDeleteRequest(req);
+        sceHttpDeleteConnection(conn);
+        sceHttpDeleteTemplate(tpl);
+        sceClibPrintf("[RA DEBUG] Image download failed with status: %d\n", status_code);
+        return NULL;
+    }
+    
+    SceUID fd = sceIoOpen(file_path, SCE_O_WRONLY | SCE_O_CREAT | SCE_O_TRUNC, 0666);
+    if (fd < 0) {
+        sceHttpDeleteRequest(req);
+        sceHttpDeleteConnection(conn);
+        sceHttpDeleteTemplate(tpl);
+        sceClibPrintf("[RA DEBUG] Failed to open file for image: %s\n", file_path);
+        return NULL;
+    }
+    
+    char buffer[4096];
+    int total_read = 0;
+    int read_size;
+    do {
+        read_size = sceHttpReadData(req, buffer, sizeof(buffer));
+        if (read_size > 0) {
+            int written = sceIoWrite(fd, buffer, read_size);
+            if (written < 0) {
+                sceClibPrintf("[RA DEBUG] Failed to write image data\n");
+                break;
+            }
+            total_read += written;
+        }
+    } while (read_size > 0);
+    
+    sceIoClose(fd);
+    sceHttpDeleteRequest(req);
+    sceHttpDeleteConnection(conn);
+    sceHttpDeleteTemplate(tpl);
+    
+    if (total_read == 0) {
+        sceClibPrintf("[RA DEBUG] No image data downloaded\n");
+        return NULL;
+    }
+    
+    sceClibPrintf("[RA DEBUG] Downloaded %d bytes of image data to %s\n", total_read, file_path);
+    
+    // Load the image as a vita2d texture
+    vita2d_texture* texture = vita2d_load_JPEG_file(file_path);
+    if (!texture) {
+        sceClibPrintf("[RA DEBUG] Failed to load image as JPEG texture\n");
+        // Try PNG as fallback
+        texture = vita2d_load_PNG_file(file_path);
+        if (!texture) {
+            sceClibPrintf("[RA DEBUG] Failed to load image as PNG texture\n");
+        }
+    }
+    
+    // Clean up temp file if not caching
+    if (!cache_filename || !cache_filename[0]) {
+        sceIoRemove(file_path);
+    }
+    
+    if (texture) {
+        sceClibPrintf("[RA DEBUG] Successfully loaded image texture\n");
+    }
+    
+    return texture;
+}
+
+// Convenience functions for specific image types
+vita2d_texture* download_avatar_texture(const char* avatar_url) {
+    if (!avatar_url || !avatar_url[0]) return NULL;
+    
+    // Generate cache filename from URL
+    char cache_filename[128];
+    const char* last_slash = strrchr(avatar_url, '/');
+    if (last_slash) {
+        snprintf(cache_filename, sizeof(cache_filename), "avatar_%s", last_slash + 1);
+    } else {
+        snprintf(cache_filename, sizeof(cache_filename), "avatar_%s.jpg", "default");
+    }
+    
+    return download_image_texture(avatar_url, cache_filename);
+}
+
+vita2d_texture* download_achievement_badge(const char* badge_url, const char* badge_name, int is_locked) {
+    if (!badge_url || !badge_url[0]) return NULL;
+    
+    // Generate cache filename
+    char cache_filename[128];
+    if (is_locked) {
+        snprintf(cache_filename, sizeof(cache_filename), "badge_%s_locked.png", badge_name);
+    } else {
+        snprintf(cache_filename, sizeof(cache_filename), "badge_%s.png", badge_name);
+    }
+    
+    return download_image_texture(badge_url, cache_filename);
+}
+
+vita2d_texture* download_game_icon(const char* icon_url, const char* game_name) {
+    if (!icon_url || !icon_url[0]) return NULL;
+    
+    // Generate cache filename
+    char cache_filename[128];
+    snprintf(cache_filename, sizeof(cache_filename), "game_%s.png", game_name);
+    
+    return download_image_texture(icon_url, cache_filename);
+}
+
+// Call this from any thread/context to trigger a notification (with optional image)
+void trigger_vita2d_notification(const char* message, unsigned duration_us, vita2d_texture* image) {
     strncpy(g_notification_msg, message, sizeof(g_notification_msg)-1);
     g_notification_msg[sizeof(g_notification_msg)-1] = '\0';
     g_notification_until = sceKernelGetProcessTimeWide() + duration_us;
+    g_notification_image = image; // Set image (can be NULL)
 }
 
 void draw_vita2d_notification(void) {
@@ -53,10 +226,25 @@ void draw_vita2d_notification(void) {
         float notif_x = (960.0f - notif_width) / 2.0f;
         float notif_y = 544.0f - notif_height - 40.0f;
         vita2d_draw_rectangle(notif_x, notif_y, notif_width, notif_height, 0xC0000000);
+        float image_size = 48.0f;
+        float image_x = notif_x + 8.0f;
+        float image_y = notif_y + (notif_height - image_size) / 2.0f;
+        float text_x = notif_x + 16.0f + image_size;
+        float text_y = notif_y + 40.0f;
+        if (g_notification_image) {
+            vita2d_draw_texture_scale(g_notification_image, image_x, image_y, image_size / vita2d_texture_get_width(g_notification_image), image_size / vita2d_texture_get_height(g_notification_image));
+        } else {
+            text_x = notif_x + 24.0f;
+        }
         float text_width = vita2d_pgf_text_width(font, 1.0f, g_notification_msg);
-        vita2d_pgf_draw_text(font, notif_x + (notif_width - text_width) / 2.0f, notif_y + 40.0f, 0xFFFFFFFF, 1.0f, g_notification_msg);
+        // If image, align text left of image; else, center text
+        if (!g_notification_image) {
+            text_x = notif_x + (notif_width - text_width) / 2.0f;
+        }
+        vita2d_pgf_draw_text(font, text_x, text_y, 0xFFFFFFFF, 1.0f, g_notification_msg);
     } else if (g_notification_msg[0]) {
         g_notification_msg[0] = 0;
+        g_notification_image = NULL;
     }
 }
 
@@ -390,6 +578,7 @@ static void login_callback(int result, const char* error_message, rc_client_t* c
     sceClibPrintf("[RA DEBUG] login_callback: username=%s\n", user->username);
     sceClibPrintf("[RA DEBUG] login_callback: display_name=%s\n", user->display_name);
     sceClibPrintf("[RA DEBUG] login_callback: score=%u\n", user->score);
+    sceClibPrintf("[RA DEBUG] login_callback: avatar_url=%s\n", user->avatar_url ? user->avatar_url : "NULL");
   } else {
     sceClibPrintf("[RA DEBUG] login_callback: user is NULL\n");
   }
@@ -401,8 +590,14 @@ static void login_callback(int result, const char* error_message, rc_client_t* c
   snprintf(login_msg, sizeof(login_msg), "Logged in as %s (%u points)", user->display_name, user->score);
   sceClibPrintf("%s", login_msg);
 
-  // Trigger notification (2 seconds)
-  trigger_vita2d_notification(login_msg, 2000000);
+  // Download avatar and trigger notification with image
+  vita2d_texture* avatar_texture = NULL;
+  if (user && user->avatar_url) {
+    avatar_texture = download_avatar_texture(user->avatar_url);
+  }
+  
+  // Trigger notification (2 seconds) with avatar image
+  trigger_vita2d_notification(login_msg, 2000000, avatar_texture);
 }
 
 void login_retroachievements_user(const char* username, const char* password)

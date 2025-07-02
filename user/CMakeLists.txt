@@ -88,6 +88,9 @@ target_link_libraries(adrenaline_user
   AdrenalineKernel_stub
   taihen_stub
   vita2d
+  z
+  png
+  jpeg
   vitashaders
   c
   m
@@ -127,6 +130,7 @@ target_link_libraries(adrenaline_user
   pthread
   m
   dl
+  z
   # ${LUA_LIBRARIES}
 )
 

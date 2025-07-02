@@ -221,6 +221,7 @@ void trigger_vita2d_notification(const char* message, unsigned duration_us, vita
 
 void draw_vita2d_notification(void) {
     if (g_notification_msg[0] && sceKernelGetProcessTimeWide() < g_notification_until) {
+        sceClibPrintf("[RA DEBUG] Drawing notification: %s\n", g_notification_msg);
         float notif_width = 600.0f;
         float notif_height = 60.0f;
         float notif_x = (960.0f - notif_width) / 2.0f;
@@ -713,48 +714,51 @@ int load_retroachievements_credentials(char* username, size_t username_size, cha
     return 0;
 }
 
-// static void show_game_placard(void)
-// {
-//   char message[128], url[128];
-//   async_image_data* image_data = NULL;
-//   const rc_client_game_t* game = rc_client_get_game_info(g_client);
-//   rc_client_user_game_summary_t summary;
-//   rc_client_get_user_game_summary(g_client, &summary);
+static void show_game_placard(void)
+{
+  char message[128], url[128];
+  // async_image_data* image_data = NULL;
+  vita2d_texture* image_data = NULL;
+  const rc_client_game_t* game = rc_client_get_game_info(g_client);
+  rc_client_user_game_summary_t summary;
+  rc_client_get_user_game_summary(g_client, &summary);
 
-//   // Construct a message indicating the number of achievements unlocked by the user.
-//   if (summary.num_core_achievements == 0)
-//   {
-//     snprintf(message, sizeof(message), "This game has no achievements.");
-//   }
-//   else if (summary.num_unsupported_achievements)
-//   {
-//     snprintf(message, sizeof(message), "You have %u of %u achievements unlocked (%d unsupported).",
-//         summary.num_unlocked_achievements, summary.num_core_achievements,
-//         summary.num_unsupported_achievements);
-//   }
-//   else
-//   {
-//     snprintf(message, sizeof(message), "You have %u of %u achievements unlocked.",
-//         summary.num_unlocked_achievements, summary.num_core_achievements);
-//   }
+  // Construct a message indicating the number of achievements unlocked by the user.
+  if (summary.num_core_achievements == 0)
+  {
+    snprintf(message, sizeof(message), "This game has no achievements.");
+  }
+  else if (summary.num_unsupported_achievements)
+  {
+    snprintf(message, sizeof(message), "You have %u of %u achievements unlocked (%d unsupported).",
+        summary.num_unlocked_achievements, summary.num_core_achievements,
+        summary.num_unsupported_achievements);
+  }
+  else
+  {
+    snprintf(message, sizeof(message), "You have %u of %u achievements unlocked.",
+        summary.num_unlocked_achievements, summary.num_core_achievements);
+  }
 
-//   // The emulator is responsible for managing images. This uses rc_client to build
-//   // the URL where the image should be downloaded from.
-//   if (rc_client_game_get_image_url(game, url, sizeof(url)) == RC_OK)
-//   {
-//     // Generate a local filename to store the downloaded image.
-//     char game_badge[64];
-//     snprintf(game_badge, sizeof(game_badge), "game_%s.png", game->badge_name);
+  // The emulator is responsible for managing images. This uses rc_client to build
+  // the URL where the image should be downloaded from.
+  if (rc_client_game_get_image_url(game, url, sizeof(url)) == RC_OK)
+  {
+    // Generate a local filename to store the downloaded image.
+    char game_badge[64];
+    snprintf(game_badge, sizeof(game_badge), "game_%s.png", game->badge_name);
 
-//     // This function will download and cache the game image. It is up to the emulator
-//     // to implement this logic. Similarly, the emulator has to use image_data to
-//     // display the game badge in the placard, or a placeholder until the image is
-//     // downloaded. None of that logic is provided in this example.
-//     image_data = download_and_cache_image(game_badge, url);
-//   } 
+    // This function will download and cache the game image. It is up to the emulator
+    // to implement this logic. Similarly, the emulator has to use image_data to
+    // display the game badge in the placard, or a placeholder until the image is
+    // downloaded. None of that logic is provided in this example.
+    // image_data = download_and_cache_image(game_badge, url);
+    image_data = download_game_icon(url, game->badge_name);
+  } 
 
-//   show_popup_message(image_data, game->title, message);
-// }
+  // show_popup_message(image_data, game->title, message);
+  trigger_vita2d_notification(message, 2000000, image_data);
+}
 
 static void load_game_callback(int result, const char* error_message, rc_client_t* client, void* userdata)
 {
@@ -765,7 +769,7 @@ static void load_game_callback(int result, const char* error_message, rc_client_
   }
 
   // announce that the game is ready. we'll cover this in the next section.
-  // show_game_placard();
+  show_game_placard();
 }
 
 void load_game(const uint8_t* rom, size_t rom_size)

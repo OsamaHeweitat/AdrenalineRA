@@ -632,6 +632,8 @@ int AdrenalineDraw(SceSize args, void *argp) {
       drawMenu();
 
     // Draw notification overlay (RA, etc.)
+    extern void check_and_show_pending_notification(void);
+    check_and_show_pending_notification();
     draw_vita2d_notification();
 
     // Draw achievements menu

@@ -46,6 +46,17 @@ static vita2d_texture* g_notification_image = NULL; // Optional image for notifi
 static int g_show_achievements_menu = 0;
 static int g_achievements_menu_sel = 0; // Currently selected item (for highlight)
 
+typedef struct {
+    int pending;
+    char message[256];
+    char image_url[256];
+    char cache_name[128];
+    int is_badge; // 1 for achievement badge, 0 for avatar
+    int is_locked; // for badge only
+} PendingNotification;
+
+static PendingNotification g_pending_notification = {0};
+
 vita2d_texture* download_image_texture(const char* image_url, const char* cache_filename) {
     if (!image_url || !image_url[0]) {
         sceClibPrintf("[RA DEBUG] No image URL provided\n");
@@ -372,7 +383,7 @@ static void async_http_get(const char* url, const char* user_agent,
     }
 
     response_buffer[total_read] = '\0'; // Null-terminate the response
-    sceClibPrintf("[RA DEBUG] HTTP response (%d bytes): %s\n", (int)total_read, response_buffer);
+    // sceClibPrintf("[RA DEBUG] HTTP response (%d bytes): %s\n", (int)total_read, response_buffer);
     callback(status_code, response_buffer, total_read, userdata, NULL);
 
     free(response_buffer);
@@ -451,7 +462,7 @@ static void async_http_post(const char* url, const char* post_data, const char* 
     }
 
     response_buffer[total_read] = '\0'; // Null-terminate the response
-    sceClibPrintf("[RA DEBUG] HTTP response (%d bytes): %s\n", (int)total_read, response_buffer);
+    // sceClibPrintf("[RA DEBUG] HTTP response (%d bytes): %s\n", (int)total_read, response_buffer);
     callback(status_code, response_buffer, total_read, userdata, NULL);
 
     free(response_buffer);
@@ -480,9 +491,9 @@ static void http_callback(int status_code, const char* content, size_t content_s
       server_response.http_status_code = RC_API_SERVER_RESPONSE_RETRYABLE_CLIENT_ERROR;
   }
 
-  sceClibPrintf("[RA DEBUG] http_callback: status=%d\n", server_response.http_status_code);
-  sceClibPrintf("[RA DEBUG] http_callback: body_length=%d\n", (int)server_response.body_length);
-  sceClibPrintf("[RA DEBUG] http_callback: body=%s\n", server_response.body);
+  // sceClibPrintf("[RA DEBUG] http_callback: status=%d\n", server_response.http_status_code);
+  // sceClibPrintf("[RA DEBUG] http_callback: body_length=%d\n", (int)server_response.body_length);
+  // sceClibPrintf("[RA DEBUG] http_callback: body=%s\n", server_response.body);
 
   // Get the rc_client callback and call it
   async_callback_data* async_data = (async_callback_data*)userdata;
@@ -523,26 +534,6 @@ static void log_message(const char* message, const rc_client_t* client)
   sceClibPrintf("%s\n", message);
 }
 
-static void event_handler(const rc_client_event_t* event, rc_client_t* client)
-{
-  printf("Event! (%d)\n", event->type);
-}
-
-void initialize_retroachievements_client(void)
-{
-  // Create the client instance (using a global variable simplifies this example)
-  g_client = rc_client_create(read_memory, server_call);
-
-  // Provide a logging function to simplify debugging
-  rc_client_enable_logging(g_client, RC_CLIENT_LOG_LEVEL_VERBOSE, log_message);
-
-  rc_client_set_event_handler(g_client, event_handler);
-
-  // Disable hardcore - if we goof something up in the implementation, we don't want our
-  // account disabled for cheating.
-  rc_client_set_hardcore_enabled(g_client, 0);
-}
-
 void shutdown_retroachievements_client(void)
 {
   if (g_client)
@@ -557,41 +548,38 @@ extern vita2d_pgf *font;
 
 static void login_callback(int result, const char* error_message, rc_client_t* client, void* userdata)
 {
-  // If not successful, just report the error and bail.
-  if (result != RC_OK)
-  {
-    sceClibPrintf("Login failed: %s\n", error_message);
-    return;
-  }
-
-  // Login was successful. Capture the token for future logins so we don't have to store the password anywhere.
-  const rc_client_user_t* user = rc_client_get_user_info(client);
-  
-  sceClibPrintf("[RA DEBUG] login_callback: user pointer=%p\n", user);
-  if (user) {
-    sceClibPrintf("[RA DEBUG] login_callback: username=%s\n", user->username);
-    sceClibPrintf("[RA DEBUG] login_callback: display_name=%s\n", user->display_name);
-    sceClibPrintf("[RA DEBUG] login_callback: score=%u\n", user->score);
-    sceClibPrintf("[RA DEBUG] login_callback: avatar_url=%s\n", user->avatar_url ? user->avatar_url : "NULL");
-  } else {
-    sceClibPrintf("[RA DEBUG] login_callback: user is NULL\n");
-  }
-  
-  store_retroachievements_credentials(user->username, user->token);
-
-  // Inform user of successful login
-  char login_msg[128];
-  snprintf(login_msg, sizeof(login_msg), "Logged in as %s (%u points)", user->display_name, user->score);
-  sceClibPrintf("%s", login_msg);
-
-  // Download avatar and trigger notification with image
-  vita2d_texture* avatar_texture = NULL;
-  if (user && user->avatar_url) {
-    avatar_texture = download_avatar_texture(user->avatar_url);
-  }
-  
-  // Trigger notification (2 seconds) with avatar image
-  trigger_vita2d_notification(login_msg, 3000000, avatar_texture);
+    if (result != RC_OK) {
+        sceClibPrintf("Login failed: %s\n", error_message);
+        return;
+    }
+    const rc_client_user_t* user = rc_client_get_user_info(client);
+    sceClibPrintf("[RA DEBUG] login_callback: user pointer=%p\n", user);
+    if (user) {
+        sceClibPrintf("[RA DEBUG] login_callback: username=%s\n", user->username);
+        sceClibPrintf("[RA DEBUG] login_callback: display_name=%s\n", user->display_name);
+        sceClibPrintf("[RA DEBUG] login_callback: score=%u\n", user->score);
+        sceClibPrintf("[RA DEBUG] login_callback: avatar_url=%s\n", user->avatar_url ? user->avatar_url : "NULL");
+    } else {
+        sceClibPrintf("[RA DEBUG] login_callback: user is NULL\n");
+    }
+    store_retroachievements_credentials(user->username, user->token);
+    char login_msg[128];
+    snprintf(login_msg, sizeof(login_msg), "Logged in as %s (%u points)", user->display_name, user->score);
+    if (user && user->avatar_url) {
+        g_pending_notification.pending = 1;
+        snprintf(g_pending_notification.message, sizeof(g_pending_notification.message), "%s", login_msg);
+        snprintf(g_pending_notification.image_url, sizeof(g_pending_notification.image_url), "%s", user->avatar_url);
+        snprintf(g_pending_notification.cache_name, sizeof(g_pending_notification.cache_name), "avatar_%s", strrchr(user->avatar_url, '/') ? strrchr(user->avatar_url, '/') + 1 : "default.jpg");
+        g_pending_notification.is_badge = 0;
+        g_pending_notification.is_locked = 0;
+    } else {
+        g_pending_notification.pending = 1;
+        snprintf(g_pending_notification.message, sizeof(g_pending_notification.message), "%s", login_msg);
+        g_pending_notification.image_url[0] = '\0';
+        g_pending_notification.cache_name[0] = '\0';
+        g_pending_notification.is_badge = 0;
+        g_pending_notification.is_locked = 0;
+    }
 }
 
 void login_retroachievements_user(const char* username, const char* password)
@@ -1119,7 +1107,7 @@ void show_achievements_menu(void)
          char achievement_badge[64];
          snprintf(achievement_badge, sizeof(achievement_badge), "ach_%s%s.png", achievement->badge_name, (achievement->state == RC_CLIENT_ACHIEVEMENT_STATE_UNLOCKED) ? "" : "_lock");
          //  sceClibPrintf("[RA DEBUG] show_achievements_menu: downloading badge '%s' from url '%s'\n", achievement_badge, url);
-         image_data = download_achievement_badge(url, achievement->badge_name, achievement->state != RC_CLIENT_ACHIEVEMENT_STATE_UNLOCKED);
+         image_data = download_achievement_badge(url, achievement_badge, achievement->state != RC_CLIENT_ACHIEVEMENT_STATE_UNLOCKED);
          //  sceClibPrintf("[RA DEBUG] show_achievements_menu: image_data=%p\n", image_data);
       }
 
@@ -1144,6 +1132,57 @@ void show_achievements_menu(void)
   sceClibPrintf("[RA DEBUG] show_achievements_menu: destroying achievement list\n");
   rc_client_destroy_achievement_list(list);
   sceClibPrintf("[RA DEBUG] show_achievements_menu: end\n");
+}
+
+static void achievement_triggered(const rc_client_achievement_t* achievement)
+{
+    char url[128];
+    if (rc_client_achievement_get_image_url(achievement, RC_CLIENT_ACHIEVEMENT_STATE_UNLOCKED, url, sizeof(url)) == RC_OK) {
+        g_pending_notification.pending = 1;
+        snprintf(g_pending_notification.message, sizeof(g_pending_notification.message),
+            "Achievement Unlocked: %s (%d)", achievement->title, achievement->points);
+        snprintf(g_pending_notification.image_url, sizeof(g_pending_notification.image_url), "%s", url);
+        snprintf(g_pending_notification.cache_name, sizeof(g_pending_notification.cache_name), "badge_%s.png", achievement->badge_name);
+        g_pending_notification.is_badge = 1;
+        g_pending_notification.is_locked = (achievement->state != RC_CLIENT_ACHIEVEMENT_STATE_UNLOCKED);
+    } else {
+        g_pending_notification.pending = 1;
+        snprintf(g_pending_notification.message, sizeof(g_pending_notification.message),
+            "Achievement Unlocked: %s (%d)", achievement->title, achievement->points);
+        g_pending_notification.image_url[0] = '\0';
+        g_pending_notification.cache_name[0] = '\0';
+        g_pending_notification.is_badge = 1;
+        g_pending_notification.is_locked = 0;
+    }
+}
+
+static void event_handler(const rc_client_event_t* event, rc_client_t* client)
+{
+  switch (event->type)
+  {
+    case RC_CLIENT_EVENT_ACHIEVEMENT_TRIGGERED:
+      achievement_triggered(event->achievement);
+      break;
+
+    default:
+      printf("Unhandled event %d\n", event->type);
+      break;
+  }
+}
+
+void initialize_retroachievements_client(void)
+{
+  // Create the client instance (using a global variable simplifies this example)
+  g_client = rc_client_create(read_memory, server_call);
+
+  // Provide a logging function to simplify debugging
+  rc_client_enable_logging(g_client, RC_CLIENT_LOG_LEVEL_VERBOSE, log_message);
+
+  rc_client_set_event_handler(g_client, event_handler);
+
+  // Disable hardcore - if we goof something up in the implementation, we don't want our
+  // account disabled for cheating.
+  rc_client_set_hardcore_enabled(g_client, 0);
 }
 
 int start() {
@@ -1188,4 +1227,19 @@ int start() {
   start_titleid_polling();
 
   return 0;
+}
+
+void check_and_show_pending_notification(void) {
+    if (g_pending_notification.pending) {
+        vita2d_texture* image = NULL;
+        if (g_pending_notification.image_url[0]) {
+            if (g_pending_notification.is_badge) {
+                image = download_image_texture(g_pending_notification.image_url, g_pending_notification.cache_name);
+            } else {
+                image = download_image_texture(g_pending_notification.image_url, g_pending_notification.cache_name);
+            }
+        }
+        trigger_vita2d_notification(g_pending_notification.message, 3000000, image);
+        g_pending_notification.pending = 0;
+    }
 }

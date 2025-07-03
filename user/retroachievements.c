@@ -536,31 +536,7 @@ void shutdown_retroachievements_client(void)
   }  
 }
 
-extern vita2d_pgf *font; // Use the global font from menu.c
-
-// void show_vita2d_notification(const char* message) {
-//     sceClibPrintf("show_vita2d_notification: %s\n", message);
-//     // Draw overlay for 2 seconds
-//     SceUInt64 start = sceKernelGetProcessTimeWide();
-//     SceUInt64 now = start;
-//     while (now - start < 2000000) { // 2,000,000 microseconds = 2 seconds
-//         vita2d_start_drawing();
-//         // Optionally: vita2d_clear_screen(); // Don't clear, just overlay
-//         // Draw a semi-transparent black box at the bottom of the screen
-//         float notif_width = 600.0f;
-//         float notif_height = 60.0f;
-//         float notif_x = (960.0f - notif_width) / 2.0f;
-//         float notif_y = 544.0f - notif_height - 40.0f;
-//         vita2d_draw_rectangle(notif_x, notif_y, notif_width, notif_height, 0xC0000000);
-//         // Draw the message centered
-//         float text_width = vita2d_pgf_text_width(font, 1.0f, message);
-//         vita2d_pgf_draw_text(font, notif_x + (notif_width - text_width) / 2.0f, notif_y + 40.0f, 0xFFFFFFFF, 1.0f, message);
-//         vita2d_end_drawing();
-//         vita2d_swap_buffers();
-//         sceKernelDelayThread(16 * 1000); // ~60fps
-//         now = sceKernelGetProcessTimeWide();
-//     }
-// }
+extern vita2d_pgf *font;
 
 static void login_callback(int result, const char* error_message, rc_client_t* client, void* userdata)
 {
@@ -598,7 +574,7 @@ static void login_callback(int result, const char* error_message, rc_client_t* c
   }
   
   // Trigger notification (2 seconds) with avatar image
-  trigger_vita2d_notification(login_msg, 2000000, avatar_texture);
+  trigger_vita2d_notification(login_msg, 3000000, avatar_texture);
 }
 
 void login_retroachievements_user(const char* username, const char* password)
@@ -757,7 +733,7 @@ static void show_game_placard(void)
   } 
 
   // show_popup_message(image_data, game->title, message);
-  trigger_vita2d_notification(message, 2000000, image_data);
+  trigger_vita2d_notification(message, 3000000, image_data);
 }
 
 static void load_game_callback(int result, const char* error_message, rc_client_t* client, void* userdata)
@@ -856,23 +832,44 @@ const char* lookup_path_by_titleid(const char* titleid) {
 int titleid_polling_thread(SceSize args, void* argp) {
   sceClibPrintf("[RA DEBUG] titleid_polling_thread started\n");
     char last_titleid[MAX_TITLEID] = {0};
+    int game_loaded = 0; // Track if we have a game loaded
+    
     while (1) {
         // Read adrenaline->titleid from shared memory
         SceAdrenaline *adrenaline = (SceAdrenaline *)ScePspemuConvertAddress(ADRENALINE_ADDRESS, KERMIT_INPUT_MODE, ADRENALINE_SIZE);
         char titleid[MAX_TITLEID] = {0};
         strncpy(titleid, adrenaline->titleid, MAX_TITLEID-1);
         titleid[MAX_TITLEID-1] = '\0';
-        if (titleid[0] != '\0' && strcmp(titleid, last_titleid) != 0) {
+        
+        // Check if game was closed (titleid became empty but we had a game loaded)
+        if (titleid[0] == '\0' && game_loaded) {
+            sceClibPrintf("[RA DEBUG] Game closed, resetting state\n");
+            game_loaded = 0;
+            last_titleid[0] = '\0'; // Reset last titleid
+            
+            if (g_client) {
+                sceClibPrintf("[RA DEBUG] Unloading game from RA client\n");
+                rc_client_unload_game(g_client);
+            }
+            
+            trigger_vita2d_notification("Game closed - watching for next game", 3000000, NULL);
+        }
+        // Check if new game was launched
+        else if (titleid[0] != '\0' && strcmp(titleid, last_titleid) != 0) {
             sceClibPrintf("[RA DEBUG] New titleid detected: %s\n", titleid);
             const char* path = lookup_path_by_titleid(titleid);
             if (path) {
                 sceClibPrintf("[RA DEBUG] Path for titleid %s: %s\n", titleid, path);
                 load_game_from_file(path);
+                game_loaded = 1; // Mark that we have a game loaded
             } else {
                 sceClibPrintf("[RA DEBUG] Path for titleid %s not found in cache\n", titleid);
+                // Even if path not found, mark as loaded to avoid repeated attempts
+                game_loaded = 1;
             }
             strncpy(last_titleid, titleid, MAX_TITLEID-1);
         }
+        
         sceKernelDelayThread(1 * 1000 * 1000); // 1 second
     }
     return 0;

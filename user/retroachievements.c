@@ -281,8 +281,12 @@ void store_retroachievements_credentials(const char* username, const char* token
 // so just provide a dummy function that returns "no memory read".
 static uint32_t read_memory(uint32_t address, uint8_t* buffer, uint32_t num_bytes, rc_client_t* client)
 {
-  // TODO: implement later
-  return 0;
+    // PSP RAM is 64MB, mapped at 0x88000000 in the emulator
+    if (address >= PSP_RAM_SIZE || address + num_bytes > PSP_RAM_SIZE)
+        return 0;
+    void *ram = (void *)ScePspemuConvertAddress(0x88000000, KERMIT_INPUT_MODE, PSP_RAM_SIZE);
+    memcpy(buffer, (uint8_t*)ram + address, num_bytes);
+    return num_bytes;
 }
 
 // Vita HTTP implementation for GET requests
@@ -519,6 +523,11 @@ static void log_message(const char* message, const rc_client_t* client)
   sceClibPrintf("%s\n", message);
 }
 
+static void event_handler(const rc_client_event_t* event, rc_client_t* client)
+{
+  printf("Event! (%d)\n", event->type);
+}
+
 void initialize_retroachievements_client(void)
 {
   // Create the client instance (using a global variable simplifies this example)
@@ -526,6 +535,8 @@ void initialize_retroachievements_client(void)
 
   // Provide a logging function to simplify debugging
   rc_client_enable_logging(g_client, RC_CLIENT_LOG_LEVEL_VERBOSE, log_message);
+
+  rc_client_set_event_handler(g_client, event_handler);
 
   // Disable hardcore - if we goof something up in the implementation, we don't want our
   // account disabled for cheating.
@@ -1159,36 +1170,6 @@ int start() {
     sceClibPrintf("SSL module loaded\n");
   } else {
     sceClibPrintf("SSL module not loaded\n");
-  }
-
-  int tpl = sceHttpCreateTemplate("Adrenaline/1.0-debug (PSVita)", 1, 1);
-  int conn = sceHttpCreateConnectionWithURL(tpl, "https://httpbin.org/post", 0);
-  int req = sceHttpCreateRequestWithURL(conn, SCE_HTTP_METHOD_POST, "https://httpbin.org/post", 0);
-  sceHttpAddRequestHeader(req, "Content-Type", "application/json", SCE_HTTP_HEADER_ADD);
-  int res = sceHttpSendRequest(req, "{\"key\":\"value\"}", 13);
-  if (res < 0) {
-    sceHttpDeleteRequest(req);
-    sceHttpDeleteConnection(conn);
-    sceHttpDeleteTemplate(tpl);
-    sceClibPrintf("Failed to send HTTP request test\n");
-    return 0;
-  }
-
-  // read and print response
-  char* response_buffer = malloc(8192 + 1);
-  if (!response_buffer) {
-    sceHttpDeleteRequest(req);
-    sceHttpDeleteConnection(conn);
-    sceHttpDeleteTemplate(tpl);
-    return 0;
-  }
-  // print
-  int read_size = sceHttpReadData(req, response_buffer, 8192);
-  if (read_size >= 0) {
-    response_buffer[read_size] = '\0'; // Null-terminate the response
-    sceClibPrintf("Response: %s\n", response_buffer);
-  } else {
-    sceClibPrintf("Failed to read HTTP response test\n");
   }
 
   initialize_retroachievements_client();

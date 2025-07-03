@@ -690,6 +690,12 @@ int AdrenalineDraw(SceSize args, void *argp) {
     vita2d_swap_buffers();
     frames++;
 
+    // Process RetroAchievements for this frame
+    extern rc_client_t* g_client;
+    if (g_client) {
+        rc_client_do_frame(g_client);
+    }
+
     // Sync
     if ((!adrenaline->pops_mode && !draw_native) || adrenaline->draw_psp_screen_in_pops)
       sceCompatLCDCSync();

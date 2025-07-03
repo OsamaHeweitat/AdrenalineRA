@@ -76,7 +76,7 @@ static int EnterStandbyMode();
 static int OpenOfficialSettings();
 static int ExitPspEmuApplication();
 static int ResetAdrenalineSettings();
-static int TestNotification();
+static int OpenAchievements();
 
 // RGB colors for the filter box used by f.lux
 static float flux_colors[] = {
@@ -97,7 +97,7 @@ static MenuEntry main_entries[] = {
   { "Open Official Settings",    MENU_ENTRY_TYPE_CALLBACK, 0, OpenOfficialSettings, NULL, NULL, 0 },
   { "Exit PspEmu Application",   MENU_ENTRY_TYPE_CALLBACK, 0, ExitPspEmuApplication, NULL, NULL, 0 },
   { "Exit Adrenaline Menu",      MENU_ENTRY_TYPE_CALLBACK, 0, ExitAdrenalineMenu, NULL, NULL, 0 },
-  { "Test Notification",         MENU_ENTRY_TYPE_CALLBACK, 0, TestNotification, NULL, NULL, 0 },
+  { "Open Achievements",         MENU_ENTRY_TYPE_CALLBACK, 0, OpenAchievements, NULL, NULL, 0 },
 };
 
 static MenuEntry settings_entries[] = {
@@ -216,8 +216,9 @@ void ascii2utf(uint16_t* dst, char* src){
 	*dst=0x00;
 }
 
-static int TestNotification() {
-  start();
+static int OpenAchievements() {
+  ExitAdrenalineMenu();
+  show_achievements_menu();
 
   return 0;
 }
@@ -529,6 +530,14 @@ int AdrenalineDraw(SceSize args, void *argp) {
     // Read pad
     readPad();
 
+    // If achievements menu is open, handle its input and block game/menu input
+    extern int achievements_menu_active();
+    extern void ctrlAchievementsMenu();
+    if (achievements_menu_active()) {
+        ctrlAchievementsMenu();
+        // Draw display as usual, but skip game/menu input for this frame
+        // (drawing is handled below, so just skip to drawing)
+    } else {
     // Double click detection
     if (menu_open == 0) {
       if (doubleClick(SCE_CTRL_PSBUTTON, 300 * 1000)) {
@@ -558,6 +567,7 @@ int AdrenalineDraw(SceSize args, void *argp) {
         ScePspemuWritebackCache(val, 1);
         combo_state = 0;
       }
+    }
     }
 
     // Do not draw if dialog is running
@@ -623,6 +633,9 @@ int AdrenalineDraw(SceSize args, void *argp) {
 
     // Draw notification overlay (RA, etc.)
     draw_vita2d_notification();
+
+    // Draw achievements menu
+    maybe_draw_achievements_menu();
 
     // f.lux filter drawing
     if (config.flux_mode != 0) {

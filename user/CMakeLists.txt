@@ -79,6 +79,7 @@ add_executable(adrenaline_user
   math_utils.c
   lz4/lz4.c
   retroachievements.c
+  virtualsfo.c
   ${RCHEEVOS_SOURCES}  # Add rcheevos source files
   dummy_fini.c
 )

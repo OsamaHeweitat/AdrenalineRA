@@ -777,6 +777,13 @@ void load_game_from_file(const char* path)
     sceClibPrintf("[RA DEBUG] g_client is NULL in load_game_from_file!\n");
     return;
   }
+  // Check if file exists with stat
+  SceIoStat stat;
+  if (sceIoGetstat(path, &stat) < 0) {
+    sceClibPrintf("[RA DEBUG] File does not exist: %s\n", path);
+    return;
+  }
+  sceClibPrintf("[RA DEBUG] File exists: %s\n", path);
   sceClibPrintf("[RA DEBUG] Calling rc_client_begin_identify_and_load_game (file) with path: %s\n", path);
   rc_client_begin_identify_and_load_game(g_client, RC_CONSOLE_PSP, path, NULL, 0, load_game_callback, NULL);
 }
@@ -879,6 +886,15 @@ int titleid_polling_thread(SceSize args, void* argp) {
                 game_loaded = 1; // Mark that we have a game loaded
             } else {
                 sceClibPrintf("[RA DEBUG] Path for titleid %s not found in cache\n", titleid);
+                // check if game exists in folder format
+                SceIoStat stat;
+                char game_path[256];
+                snprintf(game_path, sizeof(game_path), "%s/%s", GAME_DIR, titleid);
+                if (sceIoGetstat(game_path, &stat) == 0 && (stat.st_mode & SCE_S_IFDIR)) {
+                    sceClibPrintf("[RA DEBUG] Found directory for titleid %s: %s\n", titleid, game_path);
+                    snprintf(game_path, sizeof(game_path), "%s/%s/EBOOT.PBP", GAME_DIR, titleid);
+                    load_game_from_file(game_path);
+                }
                 // Even if path not found, mark as loaded to avoid repeated attempts
                 game_loaded = 1;
             }

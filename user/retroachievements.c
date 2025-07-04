@@ -57,6 +57,16 @@ typedef struct {
 
 static PendingNotification g_pending_notification = {0};
 
+char ISO_DIR[256];
+char GAME_DIR[256];
+char CACHE_FILE[256];
+char CACHE_DIR[256];
+char CREDENTIALS_FILE[256];
+
+#define MAX_TITLEID 64
+#define MAX_PATH 256
+#define MAX_CACHE_ENTRIES 1024
+
 vita2d_texture* download_image_texture(const char* image_url, const char* cache_filename) {
     if (!image_url || !image_url[0]) {
         sceClibPrintf("[RA DEBUG] No image URL provided\n");
@@ -68,10 +78,10 @@ vita2d_texture* download_image_texture(const char* image_url, const char* cache_
     // Determine file path - use cache if provided, otherwise temp
     char file_path[256];
     if (cache_filename && cache_filename[0]) {
-        snprintf(file_path, sizeof(file_path), "ux0:data/ra_cache/%s", cache_filename);
-        sceIoMkdir("ux0:data/ra_cache", 0777);
+        snprintf(file_path, sizeof(file_path), "%s/%s", CACHE_DIR, cache_filename);
+        sceIoMkdir(CACHE_DIR, 0777);
     } else {
-        snprintf(file_path, sizeof(file_path), "ux0:data/ra_temp_image.jpg");
+        snprintf(file_path, sizeof(file_path), "%s/ra_temp_image.jpg", CACHE_DIR);
     }
     
     // Check if cached version exists first
@@ -275,14 +285,14 @@ int show_message(const char* message, ...)
 
 // Store credentials to a file for persistence
 void store_retroachievements_credentials(const char* username, const char* token) {
-    SceUID fd = sceIoOpen("ux0:data/ra_credentials.txt", SCE_O_WRONLY | SCE_O_CREAT | SCE_O_TRUNC, 0666);
+    SceUID fd = sceIoOpen(CREDENTIALS_FILE, SCE_O_WRONLY | SCE_O_CREAT | SCE_O_TRUNC, 0666); 
     if (fd >= 0) {
         sceIoWrite(fd, username, strlen(username));
         sceIoWrite(fd, ":", 1);
         sceIoWrite(fd, token, strlen(token));
         sceIoWrite(fd, "\n", 1);
         sceIoClose(fd);
-        sceClibPrintf("[RA DEBUG] Credentials saved to ux0:data/ra_credentials.txt\n");
+        sceClibPrintf("[RA DEBUG] Credentials saved to %s\n", CREDENTIALS_FILE);
     } else {
         sceClibPrintf("[RA DEBUG] Failed to open credentials file for writing\n");
     }
@@ -662,7 +672,7 @@ void ssl_term() {
 
 // Load credentials from file
 int load_retroachievements_credentials(char* username, size_t username_size, char* token, size_t token_size) {
-    SceUID fd = sceIoOpen("ux0:data/ra_credentials.txt", SCE_O_RDONLY, 0);
+    SceUID fd = sceIoOpen(CREDENTIALS_FILE, SCE_O_RDONLY, 0);
     if (fd < 0) {
         sceClibPrintf("[RA DEBUG] Could not open credentials file for reading\n");
         return -1;
@@ -787,14 +797,6 @@ void load_game_from_file(const char* path)
   sceClibPrintf("[RA DEBUG] Calling rc_client_begin_identify_and_load_game (file) with path: %s\n", path);
   rc_client_begin_identify_and_load_game(g_client, RC_CONSOLE_PSP, path, NULL, 0, load_game_callback, NULL);
 }
-
-#define ISO_DIR "ux0:pspemu/ISO"
-#define GAME_DIR "ux0:pspemu/PSP/GAME"
-#define CACHE_FILE "ux0:data/ra_titleid_cache.txt"
-
-#define MAX_TITLEID 64
-#define MAX_PATH 256
-#define MAX_CACHE_ENTRIES 1024
 
 typedef struct {
     char titleid[MAX_TITLEID];
@@ -1236,6 +1238,12 @@ int start() {
   } else {
     sceClibPrintf("SSL module not loaded\n");
   }
+
+  snprintf(ISO_DIR, sizeof(ISO_DIR), "%s/ISO", getPspemuMemoryStickLocation());
+  snprintf(GAME_DIR, sizeof(GAME_DIR), "%s/PSP/GAME", getPspemuMemoryStickLocation());
+  snprintf(CACHE_FILE, sizeof(CACHE_FILE), "%s/ra_titleid_cache.txt", getPspemuMemoryStickLocation());
+  snprintf(CACHE_DIR, sizeof(CACHE_DIR), "%s/ra_cache", getPspemuMemoryStickLocation());
+  snprintf(CREDENTIALS_FILE, sizeof(CREDENTIALS_FILE), "%s/ra_credentials.txt", getPspemuMemoryStickLocation());
 
   initialize_retroachievements_client();
 

@@ -18,6 +18,8 @@ void httpTerm(void);
 int start(void);
 void load_game(const uint8_t* rom, size_t rom_size);
 void load_game_from_file(const char* path);
+void destroy_retroachievements_client(void);
+void update_credentials_from_menu(void);
 
 // Game detection functions
 void start_game_detection(void);

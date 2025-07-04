@@ -22,6 +22,9 @@
 #include <vita2d.h>
 #include <psp2/notificationutil.h>
 
+extern char g_ra_username[128];
+extern char g_ra_password[128];
+
 enum Colors {
     // Primary colors
     RED             = 0xFF0000FF,

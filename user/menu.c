@@ -62,6 +62,9 @@
 #include "includes/vflux_f.h"
 #include "includes/vflux_v.h"
 
+#include <psp2/ime_dialog.h>
+#include <psp2/common_dialog.h>
+
 static const SceGxmProgram *const gxm_program_vflux_v = (SceGxmProgram*)&vflux_v;
 static const SceGxmProgram *const gxm_program_vflux_f = (SceGxmProgram*)&vflux_f;
 
@@ -77,6 +80,9 @@ static int OpenOfficialSettings();
 static int ExitPspEmuApplication();
 static int ResetAdrenalineSettings();
 static int OpenAchievements();
+static int EnterRetroAchievementsUser();
+static int EnterRetroAchievementsPassword();
+static int LogInRetroAchievements();
 
 // RGB colors for the filter box used by f.lux
 static float flux_colors[] = {
@@ -97,7 +103,10 @@ static MenuEntry main_entries[] = {
   { "Open Official Settings",    MENU_ENTRY_TYPE_CALLBACK, 0, OpenOfficialSettings, NULL, NULL, 0 },
   { "Exit PspEmu Application",   MENU_ENTRY_TYPE_CALLBACK, 0, ExitPspEmuApplication, NULL, NULL, 0 },
   { "Exit Adrenaline Menu",      MENU_ENTRY_TYPE_CALLBACK, 0, ExitAdrenalineMenu, NULL, NULL, 0 },
-  { "Open Achievements",         MENU_ENTRY_TYPE_CALLBACK, 0, OpenAchievements, NULL, NULL, 0 },
+  { "Open Achievements List",         MENU_ENTRY_TYPE_CALLBACK, 0, OpenAchievements, NULL, NULL, 0 },
+  { "Enter RetroAchievements User", MENU_ENTRY_TYPE_CALLBACK, 0, EnterRetroAchievementsUser, NULL, NULL, 0 },
+  { "Enter RetroAchievements Password", MENU_ENTRY_TYPE_CALLBACK, 0, EnterRetroAchievementsPassword, NULL, NULL, 0 },
+  { "Log-in Retroachievements", MENU_ENTRY_TYPE_CALLBACK, 0, LogInRetroAchievements, NULL, NULL, 0 },
 };
 
 static MenuEntry settings_entries[] = {
@@ -147,6 +156,18 @@ static int changed = 0;
 static int open_official_settings = 0;
 
 static SceUID settings_semaid = -1;
+
+char g_ra_username[128] = {0};
+char g_ra_password[128] = {0};
+
+// Helper to convert UTF-8 to UTF-16
+static void utf8_to_utf16(SceWChar16 *dst, const char *src) {
+    while (*src) *dst++ = (SceWChar16)*src++;
+    *dst = 0;
+}
+
+// Declare update_credentials_from_menu for use here
+extern void update_credentials_from_menu(void);
 
 static int EnterStandbyMode() {
   stopUsb(usbdevice_modid);
@@ -220,6 +241,92 @@ static int OpenAchievements() {
   ExitAdrenalineMenu();
   show_achievements_menu();
 
+  return 0;
+}
+
+static int EnterRetroAchievementsUser() {
+    static SceWChar16 ime_buffer[128] = {0};
+    SceImeDialogParam param;
+    sceImeDialogParamInit(&param);
+    memset(ime_buffer, 0, sizeof(ime_buffer));
+    param.supportedLanguages = 0x0001FFFF;
+    param.languagesForced = 1;
+    param.type = SCE_IME_TYPE_BASIC_LATIN;
+    param.option = SCE_IME_OPTION_NO_ASSISTANCE;
+    param.maxTextLength = sizeof(ime_buffer)/sizeof(SceWChar16) - 1;
+    param.inputTextBuffer = ime_buffer;
+    SceWChar16 title[64];
+    utf8_to_utf16(title, "Enter RetroAchievements Username");
+    param.title = title;
+
+    sceImeDialogInit(&param);
+
+    // Wait for dialog to finish
+    while (sceImeDialogGetStatus() == SCE_COMMON_DIALOG_STATUS_RUNNING) {
+        sceDisplayWaitVblankStart();
+    }
+
+    SceImeDialogResult result;
+    memset(&result, 0, sizeof(result));
+    sceImeDialogGetResult(&result);
+
+    if (result.button == SCE_IME_DIALOG_BUTTON_ENTER) {
+        int i = 0;
+        for (; i < (int)sizeof(g_ra_username)-1 && ime_buffer[i]; ++i) {
+            g_ra_username[i] = (char)ime_buffer[i];
+        }
+        g_ra_username[i] = '\0';
+    } else {
+        g_ra_username[0] = '\0';
+    }
+    sceImeDialogTerm();
+    update_credentials_from_menu();
+    return 0;
+}
+
+static int EnterRetroAchievementsPassword() {
+    static SceWChar16 ime_buffer[128] = {0};
+    SceImeDialogParam param;
+    sceImeDialogParamInit(&param);
+    memset(ime_buffer, 0, sizeof(ime_buffer));
+    param.supportedLanguages = 0x0001FFFF;
+    param.languagesForced = 1;
+    param.type = SCE_IME_TYPE_BASIC_LATIN;
+    param.option = SCE_IME_OPTION_NO_ASSISTANCE;
+    param.maxTextLength = sizeof(ime_buffer)/sizeof(SceWChar16) - 1;
+    param.inputTextBuffer = ime_buffer;
+    SceWChar16 title[64];
+    utf8_to_utf16(title, "Enter RetroAchievements Password");
+    param.title = title;
+
+    sceImeDialogInit(&param);
+
+    while (sceImeDialogGetStatus() == SCE_COMMON_DIALOG_STATUS_RUNNING) {
+        sceDisplayWaitVblankStart();
+    }
+
+    SceImeDialogResult result;
+    memset(&result, 0, sizeof(result));
+    sceImeDialogGetResult(&result);
+
+    if (result.button == SCE_IME_DIALOG_BUTTON_ENTER) {
+        int i = 0;
+        for (; i < (int)sizeof(g_ra_password)-1 && ime_buffer[i]; ++i) {
+            g_ra_password[i] = (char)ime_buffer[i];
+        }
+        g_ra_password[i] = '\0';
+    } else {
+        g_ra_password[0] = '\0';
+    }
+
+    sceImeDialogTerm();
+    update_credentials_from_menu();
+    return 0;
+}
+
+static int LogInRetroAchievements() {
+  destroy_retroachievements_client();
+  start();
   return 0;
 }
 

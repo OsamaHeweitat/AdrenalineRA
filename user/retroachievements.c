@@ -298,6 +298,20 @@ void store_retroachievements_credentials(const char* username, const char* token
     }
 }
 
+void store_retroachievements_credentials_from_menu(const char* username, const char* token) {
+    SceUID fd = sceIoOpen(CREDENTIALS_FILE, SCE_O_WRONLY | SCE_O_CREAT | SCE_O_TRUNC, 0666); 
+    if (fd >= 0) {
+        sceIoWrite(fd, username, strlen(username));
+        sceIoWrite(fd, ";", 1);
+        sceIoWrite(fd, token, strlen(token));
+        sceIoWrite(fd, "\n", 1);
+        sceIoClose(fd);
+        sceClibPrintf("[RA DEBUG] Credentials saved to %s\n", CREDENTIALS_FILE);
+    } else {
+        sceClibPrintf("[RA DEBUG] Failed to open credentials file for writing\n");
+    }
+}
+
 // This is the function the rc_client will use to read memory for the emulator. we don't need it yet,
 // so just provide a dummy function that returns "no memory read".
 static uint32_t read_memory(uint32_t address, uint8_t* buffer, uint32_t num_bytes, rc_client_t* client)
@@ -672,6 +686,7 @@ void ssl_term() {
 
 // Load credentials from file
 int load_retroachievements_credentials(char* username, size_t username_size, char* token, size_t token_size) {
+    int ret = -1;
     SceUID fd = sceIoOpen(CREDENTIALS_FILE, SCE_O_RDONLY, 0);
     if (fd < 0) {
         sceClibPrintf("[RA DEBUG] Could not open credentials file for reading\n");
@@ -687,9 +702,19 @@ int load_retroachievements_credentials(char* username, size_t username_size, cha
     buf[read] = '\0';
     // Format: username:token\n
     char* sep = strchr(buf, ':');
+    ret = 0;
+    sceClibPrintf("[RA DEBUG] Credentials file format colon trying\n");
     if (!sep) {
-        sceClibPrintf("[RA DEBUG] Credentials file format invalid\n");
-        return -1;
+        sceClibPrintf("[RA DEBUG] Credentials file format semi-colon trying\n");
+        // sceClibPrintf("[RA DEBUG] Credentials file format invalid\n");
+        // return -1;
+        sep = strchr(buf, ';');
+        if (!sep) {
+            sceClibPrintf("[RA DEBUG] Credentials file format invalid\n");
+            ret = -1;
+            return ret;
+        }
+        ret = 1;
     }
     size_t ulen = sep - buf;
     if (ulen >= username_size) ulen = username_size - 1;
@@ -702,7 +727,7 @@ int load_retroachievements_credentials(char* username, size_t username_size, cha
     strncpy(token, tstart, tlen);
     token[tlen] = '\0';
     sceClibPrintf("[RA DEBUG] Loaded credentials: username=%s, token=%s\n", username, token);
-    return 0;
+    return ret;
 }
 
 static void show_game_placard(void)
@@ -1213,6 +1238,22 @@ void initialize_retroachievements_client(void)
   rc_client_set_hardcore_enabled(g_client, 0);
 }
 
+// Add externs for username/password from menu.c
+extern char g_ra_username[128];
+extern char g_ra_password[128];
+
+// Helper to update credentials file if user changed them from the menu
+void update_credentials_from_menu(void) {
+    // Only update if both are non-empty
+    if (g_ra_username[0] && g_ra_password[0]) {
+        // Save to credentials file
+        store_retroachievements_credentials_from_menu(g_ra_username, g_ra_password);
+        sceClibPrintf("[RA DEBUG] Credentials updated from menu: %s\n", g_ra_username);
+        // Optionally clear password after saving for security
+        // memset(g_ra_password, 0, sizeof(g_ra_password));
+    }
+}
+
 int start() {
   sceClibPrintf("we're trying net init\n");
   net_init();
@@ -1245,6 +1286,9 @@ int start() {
   snprintf(CACHE_DIR, sizeof(CACHE_DIR), "%s/ra_cache", getPspemuMemoryStickLocation());
   snprintf(CREDENTIALS_FILE, sizeof(CREDENTIALS_FILE), "%s/ra_credentials.txt", getPspemuMemoryStickLocation());
 
+  // Check if user updated credentials from menu and update file if so
+  update_credentials_from_menu();
+
   initialize_retroachievements_client();
 
   char username[128];
@@ -1252,15 +1296,25 @@ int start() {
   if (load_retroachievements_credentials(username, sizeof(username), token, sizeof(token)) == 0) {
     sceClibPrintf("[RA DEBUG] Logging in with stored credentials\n");
     login_remembered_retroachievements_user(username, token);
-  } else {
+  } else if (load_retroachievements_credentials(username, sizeof(username), token, sizeof(token)) == 1) {
     sceClibPrintf("[RA DEBUG] Logging in with hardcoded credentials\n");
-    login_retroachievements_user("driagonv", "REMOVED");
+    login_retroachievements_user(username, token);
+  } else {
+    sceClibPrintf("[RA DEBUG] No stored credentials found, skipping login\n");
+    rc_client_destroy(g_client);
+    g_client = NULL;
+    return 1;
   }
 
   // scan_and_cache_titleids();
   start_titleid_polling();
 
   return 0;
+}
+
+void destroy_retroachievements_client(void) {
+  rc_client_destroy(g_client);
+  g_client = NULL;
 }
 
 void check_and_show_pending_notification(void) {

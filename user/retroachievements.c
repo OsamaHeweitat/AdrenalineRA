@@ -815,7 +815,17 @@ void load_titleid_cache() {
         if (sep) {
             *sep = '\0';
             strncpy(titleid_cache[titleid_cache_count].titleid, line, MAX_TITLEID-1);
-            strncpy(titleid_cache[titleid_cache_count].path, sep+1, MAX_PATH-1);
+            titleid_cache[titleid_cache_count].titleid[MAX_TITLEID-1] = '\0';
+            
+            // Strip carriage return from the end of the path
+            char* path_start = sep + 1;
+            int path_len = strlen(path_start);
+            if (path_len > 0 && path_start[path_len-1] == '\r') {
+                path_start[path_len-1] = '\0';
+            }
+            
+            strncpy(titleid_cache[titleid_cache_count].path, path_start, MAX_PATH-1);
+            titleid_cache[titleid_cache_count].path[MAX_PATH-1] = '\0';
             titleid_cache_count++;
         }
         line = strtok(NULL, "\n");

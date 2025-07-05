@@ -77,6 +77,7 @@ add_executable(adrenaline_user
   usb.c
   utils.c
   math_utils.c
+  retroachievements_network.c
   lz4/lz4.c
   retroachievements.c
   virtualsfo.c

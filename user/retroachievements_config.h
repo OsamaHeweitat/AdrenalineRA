@@ -2,6 +2,7 @@
 #define RETROACHIEVEMENTS_CONFIG_H
 
 #include <psp2/types.h>
+#include <rc_client.h>
 
 // Configuration constants
 #define MAX_TITLEID 64
@@ -17,5 +18,7 @@ extern char GAME_DIR[256];
 extern char CACHE_FILE[256];
 extern char CACHE_DIR[256];
 extern char CREDENTIALS_FILE[256];
+
+extern rc_client_t* g_client;
 
 #endif // RETROACHIEVEMENTS_CONFIG_H

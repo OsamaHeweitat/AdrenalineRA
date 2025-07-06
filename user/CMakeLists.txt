@@ -78,6 +78,8 @@ add_executable(adrenaline_user
   utils.c
   math_utils.c
   retroachievements_network.c
+  retroachievements_iso_parser.c
+  retroachievements_cache.c
   lz4/lz4.c
   retroachievements.c
   virtualsfo.c

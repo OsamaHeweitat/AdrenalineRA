@@ -32,6 +32,7 @@
 
 #include <psp2/notificationutil.h> 
 #include "retroachievements.h"
+#include "retroachievements_ui.h"
 
 #include <stdio.h>
 #include <stdarg.h>
@@ -639,9 +640,9 @@ int AdrenalineDraw(SceSize args, void *argp) {
 
     // If achievements menu is open, handle its input and block game/menu input
     extern int achievements_menu_active();
-    extern void ctrlAchievementsMenu();
+    extern void ctrl_achievements_menu();
     if (achievements_menu_active()) {
-        ctrlAchievementsMenu();
+        ctrl_achievements_menu();
         // Draw display as usual, but skip game/menu input for this frame
         // (drawing is handled below, so just skip to drawing)
     } else {

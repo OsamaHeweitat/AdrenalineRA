@@ -425,13 +425,13 @@ void draw_progress_indicator(void) {
     float x = 180.0f;
     float y = 20.0f;
     float width = 600.0f;
-    float height = 120.0f;
+    float height = 110.0f;
     // Background
     vita2d_draw_rectangle(x, y, width, height, 0xE0000000);
     // Title
     if (font) {
-        vita2d_pgf_draw_text(font, x + 32.0f, y + 38.0f, 0xFFFFFFFF, 1.3f, g_progress_indicator.title);
-        vita2d_pgf_draw_text(font, x + 32.0f, y + 68.0f, 0xFFCCCCCC, 1.0f, g_progress_indicator.description);
-        vita2d_pgf_draw_text(font, x + 32.0f, y + 98.0f, 0xFF00FF00, 1.0f, g_progress_indicator.progress);
+        vita2d_pgf_draw_text(font, x + 32.0f, y + 28.0f, 0xFFFFFFFF, 1.3f, g_progress_indicator.title);
+        vita2d_pgf_draw_text(font, x + 32.0f, y + 58.0f, 0xFFCCCCCC, 1.0f, g_progress_indicator.description);
+        vita2d_pgf_draw_text(font, x + 32.0f, y + 88.0f, 0xFF00FF00, 1.0f, g_progress_indicator.progress);
     }
 }

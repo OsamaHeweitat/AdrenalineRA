@@ -383,6 +383,42 @@ static void progress_indicator_hide(void)
     hide_progress_indicator();
 }
 
+static void game_mastered(void)
+{
+  char message[128], submessage[128];
+  char url[128];
+  // async_image_data* image_data = NULL;
+  vita2d_texture* image_data = NULL;
+  const rc_client_game_t* game = rc_client_get_game_info(g_client);
+
+  if (rc_client_game_get_image_url(game, url, sizeof(url)) == RC_OK)
+  {
+    // Generate a local filename to store the downloaded image.
+    char game_badge[64];
+    snprintf(game_badge, sizeof(game_badge), "game_%s.png", game->badge_name); 
+    image_data = download_game_icon(url, game->badge_name);
+  }
+
+  // The popup should say "Completed GameTitle" or "Mastered GameTitle",
+  // depending on whether or not hardcore is enabled.
+  snprintf(message, sizeof(message), "%s %s", 
+      rc_client_get_hardcore_enabled(g_client) ? "Mastered" : "Completed",
+      game->title);
+
+  // You should also display the name of the user (for personalized screenshots).
+  // If the emulator keeps track of the user's per-game playtime, it's nice to
+  // display that too.
+  snprintf(submessage, sizeof(submessage), "%s", rc_client_get_user_info(g_client)->display_name);
+
+  strncat(message, " - ", sizeof(message) - strlen(message) - 1);
+  strncat(message, submessage, sizeof(message) - strlen(message) - 1);
+
+  // show_popup_message(image_data, message, submessage);
+  trigger_vita2d_notification(message, 3000000, image_data);
+
+  // play_sound("mastery.wav");
+}
+
 static void event_handler(const rc_client_event_t* event, rc_client_t* client)
 {
   sceClibPrintf("[RA DEBUG] event_handler called\n");
@@ -427,6 +463,9 @@ static void event_handler(const rc_client_event_t* event, rc_client_t* client)
     case RC_CLIENT_EVENT_ACHIEVEMENT_PROGRESS_INDICATOR_HIDE:
       sceClibPrintf("[RA DEBUG] RC_CLIENT_EVENT_ACHIEVEMENT_PROGRESS_INDICATOR_HIDE called\n");
       progress_indicator_hide();
+      break;
+    case RC_CLIENT_EVENT_GAME_COMPLETED:
+      game_mastered();
       break;
     default:
       sceClibPrintf("[RA DEBUG] Unhandled event %d\n", event->type);

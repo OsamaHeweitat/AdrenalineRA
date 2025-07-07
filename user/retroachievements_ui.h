@@ -35,4 +35,33 @@ typedef struct {
 
 extern PendingNotification g_pending_notification;
 
+// Leaderboard tracker overlay
+
+typedef struct tracker_data {
+    uint32_t id;
+    char value[24]; // RC_CLIENT_LEADERBOARD_DISPLAY_SIZE
+    int active;
+} tracker_data;
+
+void create_tracker(uint32_t id, const char* display);
+void destroy_tracker(uint32_t id);
+tracker_data* find_tracker(uint32_t id);
+void draw_leaderboard_trackers(void);
+
+// Progress indicator overlay
+
+typedef struct progress_indicator_data {
+    int active;
+    char title[128];
+    char description[128];
+    char progress[64];
+    float percent; // 0.0 to 100.0
+    SceUInt64 until; // time to hide (sceKernelGetProcessTimeWide)
+} progress_indicator_data;
+
+void show_progress_indicator(const char* title, const char* description, const char* progress, float percent, unsigned duration_us);
+void update_progress_indicator(const char* progress, float percent);
+void hide_progress_indicator(void);
+void draw_progress_indicator(void);
+
 #endif // RETROACHIEVEMENTS_UI_H

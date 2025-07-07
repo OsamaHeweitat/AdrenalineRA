@@ -309,16 +309,127 @@ static void achievement_triggered(const rc_client_achievement_t* achievement)
     }
 }
 
+static void leaderboard_started(const rc_client_leaderboard_t* leaderboard)
+{
+  sceClibPrintf("[RA DEBUG] leaderboard_started called\n");
+  show_message("Leaderboard attempt started: %s - %s", leaderboard->title, leaderboard->description);
+}
+
+static void leaderboard_failed(const rc_client_leaderboard_t* leaderboard)
+{
+  sceClibPrintf("[RA DEBUG] leaderboard_failed called\n");
+  show_message("Leaderboard attempt failed: %s", leaderboard->title);
+}
+
+static void leaderboard_submitted(const rc_client_leaderboard_t* leaderboard)
+{
+  sceClibPrintf("[RA DEBUG] leaderboard_submitted called\n");
+  show_message("Submitted %s for %s", leaderboard->tracker_value, leaderboard->title);
+}
+
+static void leaderboard_tracker_update(const rc_client_leaderboard_tracker_t* tracker)
+{
+  sceClibPrintf("[RA DEBUG] leaderboard_tracker_update called\n");
+  // Find the currently visible tracker by ID and update what's being displayed.
+  tracker_data* data = find_tracker(tracker->id);
+  if (data)
+  {
+    // The display text buffer is guaranteed to live for as long as the game is loaded,
+    // but it may be updated in a non-thread safe manner within rc_client_do_frame, so
+    // we create a copy for the rendering code to read.
+    strcpy(data->value, tracker->display);
+  }
+}
+
+static void leaderboard_tracker_show(const rc_client_leaderboard_tracker_t* tracker)
+{
+  sceClibPrintf("[RA DEBUG] leaderboard_tracker_show called\n");
+  // The actual implementation of converting an rc_client_leaderboard_tracker_t to
+  // an on-screen widget is going to be client-specific. The provided tracker object
+  // has a unique identifier for the tracker and a string to be displayed on-screen.
+  // The string should be displayed using a fixed-width font to eliminate jittering
+  // when timers are updated several times a second.
+  create_tracker(tracker->id, tracker->display);
+}
+
+static void leaderboard_tracker_hide(const rc_client_leaderboard_tracker_t* tracker)
+{
+  sceClibPrintf("[RA DEBUG] leaderboard_tracker_hide called\n");
+  // This tracker is no longer needed
+  destroy_tracker(tracker->id);
+}
+
+static void progress_indicator_update(const rc_client_achievement_t* achievement)
+{
+    // Update the progress indicator overlay with new progress string and percent
+    update_progress_indicator(achievement->measured_progress, achievement->measured_percent);
+}
+
+static void progress_indicator_show(const rc_client_achievement_t* achievement)
+{
+    // Show the progress indicator overlay with achievement info
+    show_progress_indicator(
+        achievement->title,
+        achievement->description,
+        achievement->measured_progress,
+        achievement->measured_percent,
+        2000000 // 2 seconds
+    );
+}
+
+static void progress_indicator_hide(void)
+{
+    // Hide the progress indicator overlay
+    hide_progress_indicator();
+}
+
 static void event_handler(const rc_client_event_t* event, rc_client_t* client)
 {
+  sceClibPrintf("[RA DEBUG] event_handler called\n");
   switch (event->type)
   {
     case RC_CLIENT_EVENT_ACHIEVEMENT_TRIGGERED:
+      sceClibPrintf("[RA DEBUG] RC_CLIENT_EVENT_ACHIEVEMENT_TRIGGERED called\n");
       achievement_triggered(event->achievement);
       break;
-
+    case RC_CLIENT_EVENT_LEADERBOARD_STARTED:
+      sceClibPrintf("[RA DEBUG] RC_CLIENT_EVENT_LEADERBOARD_STARTED called\n");
+      leaderboard_started(event->leaderboard);
+      break;
+    case RC_CLIENT_EVENT_LEADERBOARD_FAILED:
+      sceClibPrintf("[RA DEBUG] RC_CLIENT_EVENT_LEADERBOARD_FAILED called\n");
+      leaderboard_failed(event->leaderboard);
+      break;
+    case RC_CLIENT_EVENT_LEADERBOARD_SUBMITTED:
+      sceClibPrintf("[RA DEBUG] RC_CLIENT_EVENT_LEADERBOARD_SUBMITTED called\n");
+      leaderboard_submitted(event->leaderboard);
+      break;
+    case RC_CLIENT_EVENT_LEADERBOARD_TRACKER_UPDATE:
+      sceClibPrintf("[RA DEBUG] RC_CLIENT_EVENT_LEADERBOARD_TRACKER_UPDATE called\n");
+      leaderboard_tracker_update(event->leaderboard_tracker);
+      break;
+    case RC_CLIENT_EVENT_LEADERBOARD_TRACKER_SHOW:
+      sceClibPrintf("[RA DEBUG] RC_CLIENT_EVENT_LEADERBOARD_TRACKER_SHOW called\n");
+      leaderboard_tracker_show(event->leaderboard_tracker);
+      break;
+    case RC_CLIENT_EVENT_LEADERBOARD_TRACKER_HIDE:
+      sceClibPrintf("[RA DEBUG] RC_CLIENT_EVENT_LEADERBOARD_TRACKER_HIDE called\n");
+      leaderboard_tracker_hide(event->leaderboard_tracker);
+      break;
+    case RC_CLIENT_EVENT_ACHIEVEMENT_PROGRESS_INDICATOR_SHOW:
+      sceClibPrintf("[RA DEBUG] RC_CLIENT_EVENT_ACHIEVEMENT_PROGRESS_INDICATOR_SHOW called\n");
+      progress_indicator_show(event->achievement);
+      break;
+    case RC_CLIENT_EVENT_ACHIEVEMENT_PROGRESS_INDICATOR_UPDATE:
+      sceClibPrintf("[RA DEBUG] RC_CLIENT_EVENT_ACHIEVEMENT_PROGRESS_INDICATOR_UPDATE called\n");
+      progress_indicator_update(event->achievement);
+      break;
+    case RC_CLIENT_EVENT_ACHIEVEMENT_PROGRESS_INDICATOR_HIDE:
+      sceClibPrintf("[RA DEBUG] RC_CLIENT_EVENT_ACHIEVEMENT_PROGRESS_INDICATOR_HIDE called\n");
+      progress_indicator_hide();
+      break;
     default:
-      printf("Unhandled event %d\n", event->type);
+      sceClibPrintf("[RA DEBUG] Unhandled event %d\n", event->type);
       break;
   }
 }

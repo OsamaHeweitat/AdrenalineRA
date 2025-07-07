@@ -104,10 +104,6 @@ static MenuEntry main_entries[] = {
   { "Open Official Settings",    MENU_ENTRY_TYPE_CALLBACK, 0, OpenOfficialSettings, NULL, NULL, 0 },
   { "Exit PspEmu Application",   MENU_ENTRY_TYPE_CALLBACK, 0, ExitPspEmuApplication, NULL, NULL, 0 },
   { "Exit Adrenaline Menu",      MENU_ENTRY_TYPE_CALLBACK, 0, ExitAdrenalineMenu, NULL, NULL, 0 },
-  { "Open Achievements List",         MENU_ENTRY_TYPE_CALLBACK, 0, OpenAchievements, NULL, NULL, 0 },
-  { "Enter RetroAchievements User", MENU_ENTRY_TYPE_CALLBACK, 0, EnterRetroAchievementsUser, NULL, NULL, 0 },
-  { "Enter RetroAchievements Password", MENU_ENTRY_TYPE_CALLBACK, 0, EnterRetroAchievementsPassword, NULL, NULL, 0 },
-  { "Log-in Retroachievements", MENU_ENTRY_TYPE_CALLBACK, 0, LogInRetroAchievements, NULL, NULL, 0 },
 };
 
 static MenuEntry settings_entries[] = {
@@ -125,6 +121,13 @@ static MenuEntry settings_entries[] = {
   { "Reset Adrenaline Settings", MENU_ENTRY_TYPE_CALLBACK, 0, ResetAdrenalineSettings, NULL, NULL, 0 },
 };
 
+static MenuEntry achievements_entries[] = {
+  { "Open Achievements List",         MENU_ENTRY_TYPE_CALLBACK, 0, OpenAchievements, NULL, NULL, 0 },
+  { "Enter RetroAchievements User", MENU_ENTRY_TYPE_CALLBACK, 0, EnterRetroAchievementsUser, NULL, NULL, 0 },
+  { "Enter RetroAchievements Password", MENU_ENTRY_TYPE_CALLBACK, 0, EnterRetroAchievementsPassword, NULL, NULL, 0 },
+  { "Log-in Retroachievements", MENU_ENTRY_TYPE_CALLBACK, 0, LogInRetroAchievements, NULL, NULL, 0 },
+};
+
 static MenuEntry about_entries[] = {
   { "6.61 Adrenaline-" ADRENALINE_VERSION_MAJOR_STR "." ADRENALINE_VERSION_MINOR_STR "." ADRENALINE_VERSION_MICRO_STR, MENU_ENTRY_TYPE_TEXT, ORANGE, NULL, NULL, NULL, 0 },
   { "by TheFloW", MENU_ENTRY_TYPE_TEXT, WHITE, NULL, NULL, NULL, 0 },
@@ -136,12 +139,14 @@ static MenuEntry about_entries[] = {
   { "Rinnegatamante for f.lux", MENU_ENTRY_TYPE_TEXT, WHITE, NULL, NULL, NULL, 0 },
   { "xerpi for vita2dlib", MENU_ENTRY_TYPE_TEXT, WHITE, NULL, NULL, NULL, 0 },
   { "Cat for featurrrs", MENU_ENTRY_TYPE_TEXT, WHITE, NULL, NULL, NULL, 0 },
+  { "RA Team & Osama for RetroAchievements", MENU_ENTRY_TYPE_TEXT, WHITE, NULL, NULL, NULL, 0 },
 };
 
 static TabEntry tab_entries[] = {
   { "Main", main_entries, sizeof(main_entries) / sizeof(MenuEntry), 1 },
   { "States", NULL, 0, 0 },
   { "Settings", settings_entries, sizeof(settings_entries) / sizeof(MenuEntry), 1 },
+  { "Achievements", achievements_entries, sizeof(achievements_entries) / sizeof(MenuEntry), 1 },
   { "About", about_entries, sizeof(about_entries) / sizeof(MenuEntry), 0 },
 };
 
@@ -746,6 +751,14 @@ int AdrenalineDraw(SceSize args, void *argp) {
 
     // Draw achievements menu
     maybe_draw_achievements_menu();
+
+    // Draw leaderboard trackers
+    extern void draw_leaderboard_trackers(void);
+    draw_leaderboard_trackers();
+
+    // Draw progress indicator
+    extern void draw_progress_indicator(void);
+    draw_progress_indicator();
 
     // f.lux filter drawing
     if (config.flux_mode != 0) {

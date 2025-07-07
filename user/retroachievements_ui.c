@@ -1,6 +1,7 @@
 #include "retroachievements_config.h"
 #include "retroachievements.h"
 #include "retroachievements_ui.h"
+#include <rc_client.h>
 #include "menu.h"
 #include "utils.h"
 #include <vita2d.h>
@@ -310,5 +311,127 @@ void check_and_show_pending_notification(void) {
         }
         trigger_vita2d_notification(g_pending_notification.message, 3000000, image);
         g_pending_notification.pending = 0;
+    }
+}
+
+// --- Leaderboard Tracker Overlay ---
+#define MAX_TRACKERS 4
+static tracker_data g_trackers[MAX_TRACKERS] = {0};
+
+void create_tracker(uint32_t id, const char* display) {
+    sceClibPrintf("[RA DEBUG] create_tracker called\n");
+
+    // Find existing or free slot
+    for (int i = 0; i < MAX_TRACKERS; ++i) {
+        if (g_trackers[i].active && g_trackers[i].id == id) {
+            strncpy(g_trackers[i].value, display, sizeof(g_trackers[i].value)-1);
+            g_trackers[i].value[sizeof(g_trackers[i].value)-1] = '\0';
+            return;
+        }
+    }
+    for (int i = 0; i < MAX_TRACKERS; ++i) {
+        if (!g_trackers[i].active) {
+            g_trackers[i].id = id;
+            strncpy(g_trackers[i].value, display, sizeof(g_trackers[i].value)-1);
+            g_trackers[i].value[sizeof(g_trackers[i].value)-1] = '\0';
+            g_trackers[i].active = 1;
+            return;
+        }
+    }
+    // No free slot: do nothing
+}
+
+void destroy_tracker(uint32_t id) {
+    sceClibPrintf("[RA DEBUG] destroy_tracker called\n");
+
+    for (int i = 0; i < MAX_TRACKERS; ++i) {
+        if (g_trackers[i].active && g_trackers[i].id == id) {
+            g_trackers[i].active = 0;
+            g_trackers[i].id = 0;
+            g_trackers[i].value[0] = '\0';
+            return;
+        }
+    }
+}
+
+tracker_data* find_tracker(uint32_t id) {
+    sceClibPrintf("[RA DEBUG] find_tracker called\n");
+
+    for (int i = 0; i < MAX_TRACKERS; ++i) {
+        if (g_trackers[i].active && g_trackers[i].id == id) {
+            return &g_trackers[i];
+        }
+    }
+    return NULL;
+}
+
+void draw_leaderboard_trackers(void) {
+    // Draw all active trackers as overlay boxes at the top of the screen
+    float x = 40.0f;
+    float y = 10.0f;
+    float width = 320.0f;
+    float height = 38.0f;
+    float spacing = 8.0f;
+    int count = 0;
+    for (int i = 0; i < MAX_TRACKERS; ++i) {
+        if (g_trackers[i].active) {
+            float box_y = y + count * (height + spacing);
+            vita2d_draw_rectangle(x, box_y, width, height, 0xE0000000);
+            // Draw tracker value (fixed-width font recommended)
+            if (font) {
+                vita2d_pgf_draw_text(font, x + 16.0f, box_y + 28.0f, 0xFFFFFFFF, 1.2f, g_trackers[i].value);
+            }
+            count++;
+        }
+    }
+}
+
+// --- Progress Indicator Overlay ---
+static progress_indicator_data g_progress_indicator = {0};
+
+void show_progress_indicator(const char* title, const char* description, const char* progress, float percent, unsigned duration_us) {
+    strncpy(g_progress_indicator.title, title, sizeof(g_progress_indicator.title)-1);
+    g_progress_indicator.title[sizeof(g_progress_indicator.title)-1] = '\0';
+    strncpy(g_progress_indicator.description, description, sizeof(g_progress_indicator.description)-1);
+    g_progress_indicator.description[sizeof(g_progress_indicator.description)-1] = '\0';
+    strncpy(g_progress_indicator.progress, progress, sizeof(g_progress_indicator.progress)-1);
+    g_progress_indicator.progress[sizeof(g_progress_indicator.progress)-1] = '\0';
+    g_progress_indicator.percent = percent;
+    g_progress_indicator.active = 1;
+    g_progress_indicator.until = sceKernelGetProcessTimeWide() + duration_us;
+}
+
+void update_progress_indicator(const char* progress, float percent) {
+    if (!g_progress_indicator.active)
+        return;
+    if (progress) {
+        strncpy(g_progress_indicator.progress, progress, sizeof(g_progress_indicator.progress)-1);
+        g_progress_indicator.progress[sizeof(g_progress_indicator.progress)-1] = '\0';
+    }
+    g_progress_indicator.percent = percent;
+}
+
+void hide_progress_indicator(void) {
+    g_progress_indicator.active = 0;
+}
+
+void draw_progress_indicator(void) {
+    if (!g_progress_indicator.active)
+        return;
+    if (sceKernelGetProcessTimeWide() > g_progress_indicator.until) {
+        g_progress_indicator.active = 0;
+        return;
+    }
+    float x = 180.0f;
+    float y = 20.0f;
+    float width = 600.0f;
+    float height = 120.0f;
+    // Background
+    vita2d_draw_rectangle(x, y, width, height, 0xE0000000);
+    // Title
+    if (font) {
+        vita2d_pgf_draw_text(font, x + 32.0f, y + 38.0f, 0xFFFFFFFF, 1.3f, g_progress_indicator.title);
+        vita2d_pgf_draw_text(font, x + 32.0f, y + 68.0f, 0xFFCCCCCC, 1.0f, g_progress_indicator.description);
+        vita2d_pgf_draw_text(font, x + 32.0f, y + 98.0f, 0xFF00FF00, 1.0f, g_progress_indicator.progress);
     }
 }

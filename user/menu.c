@@ -126,6 +126,7 @@ static MenuEntry achievements_entries[] = {
   { "Enter RetroAchievements User", MENU_ENTRY_TYPE_CALLBACK, 0, EnterRetroAchievementsUser, NULL, NULL, 0 },
   { "Enter RetroAchievements Password", MENU_ENTRY_TYPE_CALLBACK, 0, EnterRetroAchievementsPassword, NULL, NULL, 0 },
   { "Log-in Retroachievements", MENU_ENTRY_TYPE_CALLBACK, 0, LogInRetroAchievements, NULL, NULL, 0 },
+  { "App will restart if you enable hardcore mode", MENU_ENTRY_TYPE_TEXT, WHITE, NULL, NULL, NULL, 0 },
   { "Hardcore Mode", MENU_ENTRY_TYPE_OPTION, 0, NULL, &config.hardcore_mode, no_yes_options, sizeof(no_yes_options) / sizeof(char **) }, // If hardcore mode is enabled, disable user access to the states menu.
 };
 
@@ -232,6 +233,11 @@ int ExitAdrenalineMenu() {
   sceKernelSignalSema(settings_semaid, 1);
 
   finishStates();
+
+  if(old_config.hardcore_mode == 0 && config.hardcore_mode == 1) {
+    // Don't allowe user to continue; take control from them and ask them to restart the emu
+    ScePspemuErrorExit(0);
+  }
 
   return 0;
 }

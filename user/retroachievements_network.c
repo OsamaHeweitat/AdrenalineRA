@@ -175,10 +175,6 @@ void async_http_post(const char* url, const char* post_data, const char* user_ag
     int conn = sceHttpCreateConnectionWithURL(tpl, url, 0);
     int req = sceHttpCreateRequestWithURL(conn, SCE_HTTP_METHOD_POST, url, strlen(post_data));
     sceHttpAddRequestHeader(req, "Content-Type", content_type, SCE_HTTP_HEADER_ADD);
-    sceClibPrintf("POST URL: %s\n", url);
-    sceClibPrintf("POST Data: %s\n", post_data);
-    sceClibPrintf("User-Agent: %s\n", user_agent);
-    sceClibPrintf("Content-Type: %s\n", content_type);
     int res = sceHttpSendRequest(req, post_data, strlen(post_data));
     if (res < 0) {
         sceHttpDeleteRequest(req);

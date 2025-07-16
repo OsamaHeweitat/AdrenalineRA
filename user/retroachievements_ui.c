@@ -41,7 +41,7 @@ void trigger_vita2d_notification(const char* message, unsigned duration_us, vita
 
 void draw_vita2d_notification(void) {
     if (g_notification_msg[0] && sceKernelGetProcessTimeWide() < g_notification_until) {
-        sceClibPrintf("[RA DEBUG] Drawing notification: %s\n", g_notification_msg);
+        // sceClibPrintf("[RA DEBUG] Drawing notification: %s\n", g_notification_msg);
         float notif_width = 600.0f;
         float notif_height = 60.0f;
         float notif_x = (960.0f - notif_width) / 2.0f;

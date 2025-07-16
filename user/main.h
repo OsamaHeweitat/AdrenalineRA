@@ -80,6 +80,7 @@ typedef struct {
   float ps1_screen_scale_x;
   float ps1_screen_scale_y;
   int usbdevice;
+  int hardcore_mode;
 } AdrenalineConfig;
 
 extern AdrenalineConfig config;

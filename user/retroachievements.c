@@ -105,7 +105,6 @@ static void http_callback(int status_code, const char* content, size_t content_s
 static void server_call(const rc_api_request_t* request,
   rc_client_server_callback_t callback, void* callback_data, rc_client_t* client)
 {
-  sceClibPrintf("server_call: url=%s\n", request->url);
 
   // RetroAchievements may not allow hardcore unlocks if we don't properly identify ourselves.
   const char* user_agent = "Adrenaline/1.0-debug (PSVita)";

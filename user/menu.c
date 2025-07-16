@@ -126,6 +126,7 @@ static MenuEntry achievements_entries[] = {
   { "Enter RetroAchievements User", MENU_ENTRY_TYPE_CALLBACK, 0, EnterRetroAchievementsUser, NULL, NULL, 0 },
   { "Enter RetroAchievements Password", MENU_ENTRY_TYPE_CALLBACK, 0, EnterRetroAchievementsPassword, NULL, NULL, 0 },
   { "Log-in Retroachievements", MENU_ENTRY_TYPE_CALLBACK, 0, LogInRetroAchievements, NULL, NULL, 0 },
+  { "Hardcore Mode", MENU_ENTRY_TYPE_OPTION, 0, NULL, &config.hardcore_mode, no_yes_options, sizeof(no_yes_options) / sizeof(char **) }, // If hardcore mode is enabled, disable user access to the states menu.
 };
 
 static MenuEntry about_entries[] = {
@@ -172,7 +173,6 @@ static void utf8_to_utf16(SceWChar16 *dst, const char *src) {
     *dst = 0;
 }
 
-// Declare update_credentials_from_menu for use here
 extern void update_credentials_from_menu(void);
 
 static int EnterStandbyMode() {
@@ -360,14 +360,22 @@ void drawMenu() {
 
   // Draw tabs
   int i;
+  int tab_i = 0;
+  float tab_size = (config.hardcore_mode == 1) ? (WINDOW_WIDTH / (N_TABS - 1)) : TAB_SIZE;
   for (i = 0; i < N_TABS; i++) {
-    vita2d_draw_rectangle(WINDOW_X + (i * TAB_SIZE), FONT_Y_LINE(19) - 5.0f, TAB_SIZE, 38.0f, tab_sel == i ? 0xFF7F3F00 : COLOR_ALPHA(GRAY, 0x8F));
+    if(config.hardcore_mode == 1 && strcmp(tab_entries[i].name, "States") == 0) {
+      continue;
+    }
+
+    vita2d_draw_rectangle(WINDOW_X + (tab_i * tab_size), FONT_Y_LINE(19) - 5.0f, tab_size, 38.0f, tab_sel == i ? 0xFF7F3F00 : COLOR_ALPHA(GRAY, 0x8F));
 
     if (i != 0)
-      vita2d_draw_rectangle(WINDOW_X + (i * TAB_SIZE) - 2.0f, FONT_Y_LINE(19) - 5.0f, 4.0f, 38.0f, COLOR_ALPHA(BLACK, 0x8F));
+      vita2d_draw_rectangle(WINDOW_X + (tab_i * tab_size) - 2.0f, FONT_Y_LINE(19) - 5.0f, 4.0f, 38.0f, COLOR_ALPHA(BLACK, 0x8F));
 
-    float x = WINDOW_X + (i * TAB_SIZE) + ALIGN_CENTER(TAB_SIZE, vita2d_pgf_text_width(font, FONT_SIZE, tab_entries[i].name));
+    float x = WINDOW_X + (tab_i * tab_size) + ALIGN_CENTER(tab_size, vita2d_pgf_text_width(font, FONT_SIZE, tab_entries[i].name));
     pgf_draw_text(x, FONT_Y_LINE(19), WHITE, FONT_SIZE, tab_entries[i].name);
+    
+    tab_i++;
   }
 
   // Draw entries
@@ -429,6 +437,9 @@ void ctrlMenu() {
       if (tab_sel > 0) {
         menu_sel = 0;
         tab_sel--;
+        if(config.hardcore_mode == 1 && strcmp(tab_entries[tab_sel].name, "States") == 0) {
+          tab_sel--;
+        }
       }
     }
 
@@ -436,12 +447,15 @@ void ctrlMenu() {
       if (tab_sel < N_TABS-1) {
         menu_sel = 0;
         tab_sel++;
+        if(config.hardcore_mode == 1 && strcmp(tab_entries[tab_sel].name, "States") == 0) {
+          tab_sel++;
+        }
       }
     }
   }
 
   // Savestates
-  if (tab_sel == 1) {
+  if (tab_sel == 1 && config.hardcore_mode == 0) {
     ctrlStates();
   } else {
     if (tab_entries[tab_sel].moveable) {

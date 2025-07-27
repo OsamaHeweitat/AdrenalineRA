@@ -311,19 +311,29 @@ static void achievement_triggered(const rc_client_achievement_t* achievement)
 static void leaderboard_started(const rc_client_leaderboard_t* leaderboard)
 {
   sceClibPrintf("[RA DEBUG] leaderboard_started called\n");
-  show_message("Leaderboard attempt started: %s - %s", leaderboard->title, leaderboard->description);
+  char finalString[128];
+  snprintf(finalString, sizeof(finalString), "Leaderboard attempt started:\n%s", leaderboard->title);
+  show_message(finalString);
+  // trigger_vita2d_notification(finalString, 3000000, NULL);
+  trigger_vita2d_top_right_notification(finalString, 3000000, NULL);
 }
 
 static void leaderboard_failed(const rc_client_leaderboard_t* leaderboard)
 {
   sceClibPrintf("[RA DEBUG] leaderboard_failed called\n");
-  show_message("Leaderboard attempt failed: %s", leaderboard->title);
+  char finalString[128];
+  snprintf(finalString, sizeof(finalString), "Leaderboard attempt failed:\n%s", leaderboard->title);
+  show_message(finalString);
+  trigger_vita2d_top_right_notification(finalString, 3000000, NULL);
 }
 
 static void leaderboard_submitted(const rc_client_leaderboard_t* leaderboard)
 {
   sceClibPrintf("[RA DEBUG] leaderboard_submitted called\n");
-  show_message("Submitted %s for %s", leaderboard->tracker_value, leaderboard->title);
+  char finalString[128];
+  snprintf(finalString, sizeof(finalString), "Submitted %s for\n%s", leaderboard->tracker_value, leaderboard->title);
+  show_message(finalString);
+  trigger_vita2d_top_right_notification(finalString, 3000000, NULL);  
 }
 
 static void leaderboard_tracker_update(const rc_client_leaderboard_tracker_t* tracker)
@@ -338,6 +348,7 @@ static void leaderboard_tracker_update(const rc_client_leaderboard_tracker_t* tr
     // we create a copy for the rendering code to read.
     strcpy(data->value, tracker->display);
   }
+  update_tracker(tracker->id, tracker->display);
 }
 
 static void leaderboard_tracker_show(const rc_client_leaderboard_tracker_t* tracker)
@@ -366,12 +377,19 @@ static void progress_indicator_update(const rc_client_achievement_t* achievement
 
 static void progress_indicator_show(const rc_client_achievement_t* achievement)
 {
+    char url[128];
+    vita2d_texture* image_data = NULL;
+
+    if (rc_client_achievement_get_image_url(achievement, RC_CLIENT_ACHIEVEMENT_STATE_UNLOCKED, url, sizeof(url)) == RC_OK) {
+        image_data = download_achievement_badge(url, achievement->badge_name, achievement->state == RC_CLIENT_ACHIEVEMENT_STATE_UNLOCKED);
+    }
     // Show the progress indicator overlay with achievement info
     show_progress_indicator(
         achievement->title,
         achievement->description,
         achievement->measured_progress,
         achievement->measured_percent,
+        image_data,
         2000000 // 2 seconds
     );
 }
@@ -413,9 +431,32 @@ static void game_mastered(void)
   strncat(message, submessage, sizeof(message) - strlen(message) - 1);
 
   // show_popup_message(image_data, message, submessage);
-  trigger_vita2d_notification(message, 3000000, image_data);
+  trigger_vita2d_top_right_notification(message, 3000000, image_data);
 
   // play_sound("mastery.wav");
+}
+
+static void challenge_indicator_show(const rc_client_achievement_t* achievement)
+{
+  char url[128];
+  vita2d_texture* image_data = NULL;
+
+  if (rc_client_achievement_get_image_url(achievement, RC_CLIENT_ACHIEVEMENT_STATE_UNLOCKED, url, sizeof(url)) == RC_OK)
+  {
+     // Generate a local filename to store the downloaded image.
+     char achievement_badge[64];
+     snprintf(achievement_badge, sizeof(achievement_badge), "ach_%s.png", achievement->badge_name);
+     image_data = download_achievement_badge(url, achievement->badge_name, achievement->state == RC_CLIENT_ACHIEVEMENT_STATE_UNLOCKED);
+  }
+
+  // Multiple challenge indicators may be shown, but only one per achievement, so key the list on the achievement ID
+  create_challenge_indicator(achievement->id, image_data);
+}
+
+static void challenge_indicator_hide(const rc_client_achievement_t* achievement)
+{
+  // This indicator is no longer needed
+  destroy_challenge_indicator(achievement->id);
 }
 
 static void event_handler(const rc_client_event_t* event, rc_client_t* client)
@@ -466,6 +507,14 @@ static void event_handler(const rc_client_event_t* event, rc_client_t* client)
     case RC_CLIENT_EVENT_GAME_COMPLETED:
       game_mastered();
       break;
+    case RC_CLIENT_EVENT_ACHIEVEMENT_CHALLENGE_INDICATOR_SHOW:
+      sceClibPrintf("[RA DEBUG] RC_CLIENT_EVENT_ACHIEVEMENT_CHALLENGE_INDICATOR_SHOW called\n");
+      challenge_indicator_show(event->achievement);
+      break;
+    case RC_CLIENT_EVENT_ACHIEVEMENT_CHALLENGE_INDICATOR_HIDE:
+      sceClibPrintf("[RA DEBUG] RC_CLIENT_EVENT_ACHIEVEMENT_CHALLENGE_INDICATOR_HIDE called\n");
+      challenge_indicator_hide(event->achievement);
+      break;
     default:
       sceClibPrintf("[RA DEBUG] Unhandled event %d\n", event->type);
       break;
@@ -484,7 +533,8 @@ void initialize_retroachievements_client(void)
 
   // Disable hardcore - if we goof something up in the implementation, we don't want our
   // account disabled for cheating.
-  rc_client_set_hardcore_enabled(g_client, 0);
+  // rc_client_set_hardcore_enabled(g_client, 0);
+  rc_client_set_hardcore_enabled(g_client, config.hardcore_mode);
 }
 
 int start() {
@@ -541,6 +591,8 @@ int start() {
 
   // scan_and_cache_titleids();
   start_titleid_polling();
+
+  show_message("hello worldy!!!");
 
   return 0;
 }

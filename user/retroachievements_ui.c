@@ -6,17 +6,33 @@
 #include "utils.h"
 #include <vita2d.h>
 
+#define MAX_MENU_ITEMS 128
+#define MAX_MENU_TEXT 128
+#define MAX_CHALLENGE_INDICATORS 128
+
 static char g_notification_msg[128] = {0};
 static SceUInt64 g_notification_until = 0;
-static vita2d_texture* g_notification_image = NULL; // Optional
+static vita2d_texture* g_notification_image = NULL;
+static char g_notification_top_right_msg[128] = {0};
+static SceUInt64 g_notification_top_right_until = 0;
+static vita2d_texture* g_notification_top_right_image = NULL;
 
 static int g_show_achievements_menu = 0;
 static int g_achievements_menu_sel = 0; // Currently selected item (for highlight)
+static int g_show_please_wait = 0;
+
+typedef struct challenge_indicator_data {
+    int active;
+    uint32_t id;
+    vita2d_texture* image;
+} challenge_indicator_data;
+
+static struct {
+    int count;
+    challenge_indicator_data indicators[MAX_CHALLENGE_INDICATORS];
+} g_challenge_indicators = {0};
 
 PendingNotification g_pending_notification = {0};
-
-#define MAX_MENU_ITEMS 128
-#define MAX_MENU_TEXT 128
 
 typedef struct MenuItem {
     vita2d_texture* image;
@@ -37,6 +53,13 @@ void trigger_vita2d_notification(const char* message, unsigned duration_us, vita
     g_notification_msg[sizeof(g_notification_msg)-1] = '\0';
     g_notification_until = sceKernelGetProcessTimeWide() + duration_us;
     g_notification_image = image; // Set image (can be NULL)
+}
+
+void trigger_vita2d_top_right_notification(const char* message, unsigned duration_us, vita2d_texture* image) {
+    strncpy(g_notification_top_right_msg, message, sizeof(g_notification_top_right_msg)-1);
+    g_notification_top_right_msg[sizeof(g_notification_top_right_msg)-1] = '\0';
+    g_notification_top_right_until = sceKernelGetProcessTimeWide() + duration_us;
+    g_notification_top_right_image = image; // Set image (can be NULL)
 }
 
 void draw_vita2d_notification(void) {
@@ -67,6 +90,42 @@ void draw_vita2d_notification(void) {
         g_notification_msg[0] = 0;
         g_notification_image = NULL;
     }
+}
+
+void draw_vita2d_top_right_notification(void) {
+    if (g_notification_top_right_msg[0] && sceKernelGetProcessTimeWide() < g_notification_top_right_until) {
+        // sceClibPrintf("[RA DEBUG] Drawing top-right notification: %s\n", g_notification_msg);
+        float notif_width = 400.0f;  // Slightly smaller for top-right position
+        float notif_height = 60.0f;
+        float notif_x = 960.0f - notif_width - 20.0f;  // 20px margin from right edge
+        float notif_y = 20.0f;  // 20px margin from top edge
+        vita2d_draw_rectangle(notif_x, notif_y, notif_width, notif_height, 0xC0000000);
+        float image_size = 48.0f;
+        float image_x = notif_x + 8.0f;
+        float image_y = notif_y + (notif_height - image_size) / 2.0f;
+        float text_x = notif_x + 16.0f + image_size;
+        float text_height = vita2d_pgf_text_height(font, 1.0f, g_notification_msg);
+        float text_y = notif_y + (notif_height - text_height) / 2.0f;
+        if (g_notification_top_right_image) {
+            vita2d_draw_texture_scale(g_notification_top_right_image, image_x, image_y, image_size / vita2d_texture_get_width(g_notification_top_right_image), image_size / vita2d_texture_get_height(g_notification_top_right_image));
+        } else {
+            text_x = notif_x + 24.0f;
+        }
+        float text_width = vita2d_pgf_text_width(font, 1.0f, g_notification_top_right_msg);
+        // If no image, center text within the notification box
+        if (!g_notification_top_right_image) {
+            text_x = notif_x + (notif_width - text_width) / 2.0f;
+        }
+        vita2d_pgf_draw_text(font, text_x, text_y, 0xFFFFFFFF, 1.0f, g_notification_top_right_msg);
+    } else if (g_notification_top_right_msg[0]) {
+        g_notification_top_right_msg[0] = 0;
+        g_notification_top_right_image = NULL;
+    }
+}
+
+void draw_please_wait(void) {
+    vita2d_draw_rectangle(0, 0, 960, 544, 0xE0000000);
+    vita2d_pgf_draw_text(font, 480, 272, 0xFFFFFFFF, 1.5f, "Please wait...");
 }
 
 void draw_achievements_menu() {
@@ -191,6 +250,10 @@ void maybe_draw_achievements_menu(void) {
     if (g_show_achievements_menu) {
         draw_achievements_menu();
     }
+
+    if(g_show_please_wait) {
+        draw_please_wait();
+    }
 }
 
 // also call this from the main loop to block game input and handle achievements menu
@@ -201,6 +264,7 @@ int achievements_menu_active(void) {
 void show_achievements_menu(void)
 {
   sceClibPrintf("[RA DEBUG] show_achievements_menu: start\n");
+  g_show_please_wait = 1;
   char url[128];
   const char* progress;
 
@@ -253,7 +317,7 @@ void show_achievements_menu(void)
       menu_append_item(image_data, achievement->title, achievement->description, progress);
     }
   }
-
+  g_show_please_wait = 0;
   // drawAchievementsMenu();
   request_show_achievements_menu();
   sceClibPrintf("[RA DEBUG] show_achievements_menu: destroying achievement list\n");
@@ -365,11 +429,20 @@ tracker_data* find_tracker(uint32_t id) {
     return NULL;
 }
 
+void update_tracker(uint32_t id, const char* display) {
+    sceClibPrintf("[RA DEBUG] update_tracker called\n");
+    tracker_data* data = find_tracker(id);
+    if (data) {
+        strncpy(data->value, display, sizeof(data->value)-1);
+        data->value[sizeof(data->value)-1] = '\0';
+    }
+}
+
 void draw_leaderboard_trackers(void) {
-    // Draw all active trackers as overlay boxes at the top of the screen
+    // Draw all active trackers as overlay boxes at the bottom left of the screen
     float x = 40.0f;
-    float y = 10.0f;
-    float width = 320.0f;
+    float y = 544.0f - 38.0f - 10.0f;
+    float width = 170.0f;
     float height = 38.0f;
     float spacing = 8.0f;
     int count = 0;
@@ -389,7 +462,7 @@ void draw_leaderboard_trackers(void) {
 // --- Progress Indicator Overlay ---
 static progress_indicator_data g_progress_indicator = {0};
 
-void show_progress_indicator(const char* title, const char* description, const char* progress, float percent, unsigned duration_us) {
+void show_progress_indicator(const char* title, const char* description, const char* progress, float percent, vita2d_texture* image, unsigned duration_us) {
     strncpy(g_progress_indicator.title, title, sizeof(g_progress_indicator.title)-1);
     g_progress_indicator.title[sizeof(g_progress_indicator.title)-1] = '\0';
     strncpy(g_progress_indicator.description, description, sizeof(g_progress_indicator.description)-1);
@@ -399,6 +472,7 @@ void show_progress_indicator(const char* title, const char* description, const c
     g_progress_indicator.percent = percent;
     g_progress_indicator.active = 1;
     g_progress_indicator.until = sceKernelGetProcessTimeWide() + duration_us;
+    g_progress_indicator.image = image;
 }
 
 void update_progress_indicator(const char* progress, float percent) {
@@ -416,22 +490,90 @@ void hide_progress_indicator(void) {
 }
 
 void draw_progress_indicator(void) {
-    if (!g_progress_indicator.active)
+    // if (!g_progress_indicator.active)
+    //     return;
+    // if (sceKernelGetProcessTimeWide() > g_progress_indicator.until) {
+    //     g_progress_indicator.active = 0;
+    //     return;
+    // }
+    // float x = 180.0f;
+    // float y = 20.0f;
+    // float width = 600.0f;
+    // float height = 110.0f;
+    // // Background
+    // vita2d_draw_rectangle(x, y, width, height, 0xE0000000);
+    // // Title
+    // if (font) {
+    //     vita2d_pgf_draw_text(font, x + 32.0f, y + 28.0f, 0xFFFFFFFF, 1.3f, g_progress_indicator.title);
+    //     vita2d_pgf_draw_text(font, x + 32.0f, y + 58.0f, 0xFFCCCCCC, 1.0f, g_progress_indicator.description);
+    //     vita2d_pgf_draw_text(font, x + 32.0f, y + 88.0f, 0xFF00FF00, 1.0f, g_progress_indicator.progress);
+    // }
+    
+    // Bottom right progress indicator - just image and progress text
+    if(!g_progress_indicator.active)
         return;
-    if (sceKernelGetProcessTimeWide() > g_progress_indicator.until) {
+    if(sceKernelGetProcessTimeWide() > g_progress_indicator.until) {
         g_progress_indicator.active = 0;
         return;
     }
-    float x = 180.0f;
-    float y = 20.0f;
-    float width = 600.0f;
-    float height = 110.0f;
+    if(!g_progress_indicator.image)
+        return;
+
+    float image_size = 48.0f;
+    float spacing = 10.0f;
+    float text_width = vita2d_pgf_text_width(font, 1.0f, g_progress_indicator.progress); // Use this to calculate when text should end
+    float text_height = vita2d_pgf_text_height(font, 1.0f, g_progress_indicator.progress); // Use this to calculate when text should end
+    float width = text_width + image_size + spacing * 3.0f; // spacing - image - spacing - text- spacing
+    float height = image_size + spacing * 2.0f; // spacing - image/text - spacing
+    float x = 960.0f - width - spacing; // edge of screen - width to create rectangle - space for margin between rectange and screen
+    float y = 544.0f - height - spacing; // edge of screen - height to create rectangle - space for margin between rectange and screen
+
     // Background
     vita2d_draw_rectangle(x, y, width, height, 0xE0000000);
-    // Title
-    if (font) {
-        vita2d_pgf_draw_text(font, x + 32.0f, y + 28.0f, 0xFFFFFFFF, 1.3f, g_progress_indicator.title);
-        vita2d_pgf_draw_text(font, x + 32.0f, y + 58.0f, 0xFFCCCCCC, 1.0f, g_progress_indicator.description);
-        vita2d_pgf_draw_text(font, x + 32.0f, y + 88.0f, 0xFF00FF00, 1.0f, g_progress_indicator.progress);
+    // Image
+    vita2d_draw_texture_scale(g_progress_indicator.image, x + spacing, y + spacing, image_size / vita2d_texture_get_width(g_progress_indicator.image), image_size / vita2d_texture_get_height(g_progress_indicator.image));
+    // Progress text
+    vita2d_pgf_draw_text(font, x + spacing + image_size + spacing, y + ((height / 2.0f)), 0xFFFFFFFF, 1.0f, g_progress_indicator.progress);
+}
+
+void create_challenge_indicator(uint32_t id, vita2d_texture* image) {
+    sceClibPrintf("[RA DEBUG] create_challenge_indicator called\n");
+    if (g_challenge_indicators.count >= MAX_CHALLENGE_INDICATORS || !image)
+        return;
+    challenge_indicator_data* indicator = &g_challenge_indicators.indicators[g_challenge_indicators.count++];
+    indicator->id = id;
+    indicator->image = image;
+    indicator->active = 1;
+}
+
+void destroy_challenge_indicator(uint32_t id) {
+    sceClibPrintf("[RA DEBUG] destroy_challenge_indicator called\n");
+    for (int i = 0; i < g_challenge_indicators.count; ++i) {
+        if (g_challenge_indicators.indicators[i].active && g_challenge_indicators.indicators[i].id == id) {
+            g_challenge_indicators.indicators[i].active = 0;
+            g_challenge_indicators.indicators[i].id = 0;
+            g_challenge_indicators.indicators[i].image = NULL;
+            vita2d_free_texture(g_challenge_indicators.indicators[i].image);
+        }
+    }
+}
+
+void draw_challenge_indicators(void) {
+    // sceClibPrintf("[RA DEBUG] draw_challenge_indicators called\n");
+    float x = 10.0f;
+    float y = 10.0f;
+    float image_size = 48.0f;
+    float box_margins = 5.0f;
+    float box_width = image_size + box_margins * 2.0f;
+    float box_height = image_size + box_margins * 2.0f;
+    float spacing = 10.0f + box_margins * 2.0f;
+    if (g_challenge_indicators.count == 0)
+        return;
+    for (int i = 0; i < g_challenge_indicators.count; ++i) {
+        if (g_challenge_indicators.indicators[i].active) {
+            vita2d_draw_rectangle(x, y, box_width, box_height, 0xE0000000);
+            vita2d_draw_texture_scale(g_challenge_indicators.indicators[i].image, x + box_margins, y + box_margins, image_size / vita2d_texture_get_width(g_challenge_indicators.indicators[i].image), image_size / vita2d_texture_get_height(g_challenge_indicators.indicators[i].image));
+            x += image_size + spacing;
+        }
     }
 }

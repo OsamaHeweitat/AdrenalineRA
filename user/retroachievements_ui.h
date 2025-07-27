@@ -45,8 +45,12 @@ typedef struct tracker_data {
 
 void create_tracker(uint32_t id, const char* display);
 void destroy_tracker(uint32_t id);
+void update_tracker(uint32_t id, const char* display);
 tracker_data* find_tracker(uint32_t id);
 void draw_leaderboard_trackers(void);
+void draw_challenge_indicators(void);
+void create_challenge_indicator(uint32_t id, vita2d_texture* image);
+void destroy_challenge_indicator(uint32_t id);
 
 // Progress indicator overlay
 
@@ -57,9 +61,10 @@ typedef struct progress_indicator_data {
     char progress[64];
     float percent; // 0.0 to 100.0
     SceUInt64 until; // time to hide (sceKernelGetProcessTimeWide)
+    vita2d_texture* image;
 } progress_indicator_data;
 
-void show_progress_indicator(const char* title, const char* description, const char* progress, float percent, unsigned duration_us);
+void show_progress_indicator(const char* title, const char* description, const char* progress, float percent, vita2d_texture* image, unsigned duration_us);
 void update_progress_indicator(const char* progress, float percent);
 void hide_progress_indicator(void);
 void draw_progress_indicator(void);

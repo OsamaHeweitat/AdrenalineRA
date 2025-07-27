@@ -126,7 +126,7 @@ static MenuEntry achievements_entries[] = {
   { "Enter RetroAchievements User", MENU_ENTRY_TYPE_CALLBACK, 0, EnterRetroAchievementsUser, NULL, NULL, 0 },
   { "Enter RetroAchievements Password", MENU_ENTRY_TYPE_CALLBACK, 0, EnterRetroAchievementsPassword, NULL, NULL, 0 },
   { "Log-in Retroachievements", MENU_ENTRY_TYPE_CALLBACK, 0, LogInRetroAchievements, NULL, NULL, 0 },
-  { "App will restart if you enable hardcore mode", MENU_ENTRY_TYPE_TEXT, WHITE, NULL, NULL, NULL, 0 },
+  { "Note: App will restart if you change hardcore mode", MENU_ENTRY_TYPE_TEXT, WHITE, NULL, NULL, NULL, 0 },
   { "Hardcore Mode", MENU_ENTRY_TYPE_OPTION, 0, NULL, &config.hardcore_mode, no_yes_options, sizeof(no_yes_options) / sizeof(char **) }, // If hardcore mode is enabled, disable user access to the states menu.
 };
 
@@ -235,7 +235,12 @@ int ExitAdrenalineMenu() {
   finishStates();
 
   if(old_config.hardcore_mode == 0 && config.hardcore_mode == 1) {
-    // Don't allowe user to continue; take control from them and ask them to restart the emu
+    // If hardcore mode was enabled, restart the app (well, exit it)
+    ScePspemuErrorExit(0);
+  }
+
+  // TODO: reset the rc_client instead of the entire emu
+  if(old_config.hardcore_mode == 1 && config.hardcore_mode == 0) {
     ScePspemuErrorExit(0);
   }
 
@@ -668,8 +673,6 @@ int AdrenalineDraw(SceSize args, void *argp) {
     extern void ctrl_achievements_menu();
     if (achievements_menu_active()) {
         ctrl_achievements_menu();
-        // Draw display as usual, but skip game/menu input for this frame
-        // (drawing is handled below, so just skip to drawing)
     } else {
     // Double click detection
     if (menu_open == 0) {
@@ -768,6 +771,7 @@ int AdrenalineDraw(SceSize args, void *argp) {
     extern void check_and_show_pending_notification(void);
     check_and_show_pending_notification();
     draw_vita2d_notification();
+    draw_vita2d_top_right_notification();
 
     // Draw achievements menu
     maybe_draw_achievements_menu();
@@ -775,6 +779,10 @@ int AdrenalineDraw(SceSize args, void *argp) {
     // Draw leaderboard trackers
     extern void draw_leaderboard_trackers(void);
     draw_leaderboard_trackers();
+
+    // Draw challenge indicators
+    extern void draw_challenge_indicators(void);
+    draw_challenge_indicators();
 
     // Draw progress indicator
     extern void draw_progress_indicator(void);

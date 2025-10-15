@@ -162,6 +162,7 @@ int menu_open = 0;
 
 static int changed = 0;
 static int open_official_settings = 0;
+static int achievements_modal_active = 0;
 
 static SceUID settings_semaid = -1;
 
@@ -255,7 +256,8 @@ void ascii2utf(uint16_t* dst, char* src){
 }
 
 static int OpenAchievements() {
-  ExitAdrenalineMenu();
+  // Keep the Adrenaline menu gate active while achievements overlay is open
+  achievements_modal_active = 1;
   show_achievements_menu();
 
   return 0;
@@ -674,6 +676,10 @@ int AdrenalineDraw(SceSize args, void *argp) {
     if (achievements_menu_active()) {
         ctrl_achievements_menu();
     } else {
+    if (achievements_modal_active) {
+      ExitAdrenalineMenu();
+      achievements_modal_active = 0;
+    }
     // Double click detection
     if (menu_open == 0) {
       if (doubleClick(SCE_CTRL_PSBUTTON, 300 * 1000)) {
@@ -764,8 +770,11 @@ int AdrenalineDraw(SceSize args, void *argp) {
     }
 
     // Draw Menu
-    if (menu_open)
-      drawMenu();
+    if (menu_open) {
+      extern int achievements_menu_active();
+      if (!achievements_menu_active())
+        drawMenu();
+    }
 
     // Draw notification overlay (RA, etc.)
     extern void check_and_show_pending_notification(void);
@@ -854,8 +863,11 @@ int AdrenalineDraw(SceSize args, void *argp) {
       sceDisplayWaitVblankStart();
 
     // Ctrl
-    if (menu_open)
-      ctrlMenu();
+    if (menu_open) {
+      extern int achievements_menu_active();
+      if (!achievements_menu_active())
+        ctrlMenu();
+    }
   }
 
   return sceKernelExitDeleteThread(0);

@@ -202,7 +202,6 @@ static void show_game_placard(void)
   rc_client_user_game_summary_t summary;
   rc_client_get_user_game_summary(g_client, &summary);
 
-  // Construct a message indicating the number of achievements unlocked by the user.
   if (summary.num_core_achievements == 0)
   {
     snprintf(message, sizeof(message), "This game has no achievements.");
@@ -260,6 +259,8 @@ void load_game(const uint8_t* rom, size_t rom_size)
     return;
   }
   sceClibPrintf("[RA DEBUG] Calling rc_client_begin_identify_and_load_game (memory)\n");
+  // show notification that the game is loading
+  trigger_vita2d_top_right_notification("Please wait for game to be identified...", 3000000, NULL);
   rc_client_begin_identify_and_load_game(g_client, RC_CONSOLE_PSP, NULL, rom, rom_size, load_game_callback, NULL);
 }
 
@@ -283,6 +284,7 @@ void load_game_from_file(const char* path)
   }
   sceClibPrintf("[RA DEBUG] File exists: %s\n", path);
   sceClibPrintf("[RA DEBUG] Calling rc_client_begin_identify_and_load_game (file) with path: %s\n", path);
+  trigger_vita2d_top_right_notification("Please wait for game to be identified...", 3000000, NULL);
   rc_client_begin_identify_and_load_game(g_client, RC_CONSOLE_PSP, path, NULL, 0, load_game_callback, NULL);
 }
 
@@ -586,6 +588,7 @@ int start() {
     sceClibPrintf("[RA DEBUG] No stored credentials found, skipping login\n");
     rc_client_destroy(g_client);
     g_client = NULL;
+    trigger_vita2d_notification("Please log in to RA in the Adrenaline Settings menu", 3000000, NULL);
     return 1;
   }
 

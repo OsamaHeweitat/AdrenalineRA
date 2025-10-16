@@ -263,6 +263,7 @@ int achievements_menu_active(void) {
 
 void show_achievements_menu(void)
 {
+  trigger_vita2d_top_right_notification("Please wait for achievements to be loaded...", 3000000, NULL);
   sceClibPrintf("[RA DEBUG] show_achievements_menu: start\n");
   g_show_please_wait = 1;
   char url[128];

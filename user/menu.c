@@ -769,6 +769,13 @@ int AdrenalineDraw(SceSize args, void *argp) {
       vita2d_draw_texture_scale_rotate_hotspot(pops_tex, 480.0f, 272.0f, scale_x, scale_y, 0.0, 480.0, 272.0);
     }
 
+    // reset to opaque/default textured shader before drawing UI overlays
+    // this avoids applying the PSP scaling filter (e.g sharp bilinear) to overlay elements
+    vita2d_texture_set_program(opaque_shader->vertexProgram, opaque_shader->fragmentProgram);
+    vita2d_texture_set_wvp(opaque_shader->wvpParam);
+    vita2d_texture_set_vertexInput(&opaque_shader->vertexInput);
+    vita2d_texture_set_fragmentInput(&opaque_shader->fragmentInput);
+
     // Draw Menu
     if (menu_open) {
       extern int achievements_menu_active();

@@ -670,6 +670,9 @@ int AdrenalineDraw(SceSize args, void *argp) {
     // Read pad
     readPad();
 
+    // track transition from GPU-composited Original mode back to PSP-side presentation
+    static int original_composite_cooldown = 0; // frames to continue GPU composite after overlays disappear
+
     // If achievements menu is open, handle its input and block game/menu input
     extern int achievements_menu_active();
     extern void ctrl_achievements_menu();
@@ -709,13 +712,39 @@ int AdrenalineDraw(SceSize args, void *argp) {
         ScePspemuWritebackCache(val, 1);
         combo_state = 0;
       }
-    }
+      }
     }
 
     // Do not draw if dialog is running
-    if (sceCommonDialogIsRunning() || (config.graphics_filtering == 0 && menu_open == 0 && draw_native == 0)) {
+    if (sceCommonDialogIsRunning()) {
       sceDisplayWaitVblankStart();
       continue;
+    }
+
+    // in Original filtering (0), PSP framebuffer is drawn by PSP side. if overlays are active OR
+    // we're in a brief cooldown after overlays, use GPU composite. otherwise, skip GPU draw.
+    if (config.graphics_filtering == 0 && menu_open == 0 && draw_native == 0) {
+      extern int ra_overlays_active(void);
+      int overlays = ra_overlays_active();
+      if (overlays) {
+        original_composite_cooldown = 2;
+        sceClibPrintf("[RA DEBUG] Original (overlays active): using GPU composite path this frame\n");
+      } else if (original_composite_cooldown > 0) {
+        sceClibPrintf("[RA DEBUG] Original (cooldown=%d): using GPU composite path\n", original_composite_cooldown);
+      }
+      if (!overlays && original_composite_cooldown <= 0) {
+        sceClibPrintf("[RA DEBUG] Original (no overlays): skip GPU draw, wait & sync\n");
+        // maintain RA processing and PSP cadence
+        extern rc_client_t* g_client;
+        if (g_client) {
+          rc_client_do_frame(g_client);
+        }
+        if ((!adrenaline->pops_mode && !draw_native) || adrenaline->draw_psp_screen_in_pops)
+          sceCompatLCDCSync();
+        else
+          sceDisplayWaitVblankStart();
+        continue;
+      }
     }
 
     // Draw display
@@ -780,7 +809,7 @@ int AdrenalineDraw(SceSize args, void *argp) {
     if (menu_open) {
       extern int achievements_menu_active();
       if (!achievements_menu_active())
-        drawMenu();
+      drawMenu();
     }
 
     // Draw notification overlay (RA, etc.)
@@ -869,11 +898,28 @@ int AdrenalineDraw(SceSize args, void *argp) {
     else
       sceDisplayWaitVblankStart();
 
+    // In Original mode, if we were compositing due to overlays but overlays are now gone,
+    // step down the cooldown and when it reaches 0, hand display back to PSP side.
+    if (config.graphics_filtering == 0 && menu_open == 0 && !draw_native) {
+      extern int ra_overlays_active(void);
+      int overlays = ra_overlays_active();
+      if (!overlays) {
+        if (original_composite_cooldown > 0) {
+          original_composite_cooldown--;
+          sceClibPrintf("[RA DEBUG] Original cooldown now %d\n", original_composite_cooldown);
+          if (original_composite_cooldown == 0) {
+            sceClibPrintf("[RA DEBUG] Original cooldown ended: restoring PSP display config\n");
+            ScePspemuSetDisplayConfig();
+          }
+        }
+      }
+    }
+
     // Ctrl
     if (menu_open) {
       extern int achievements_menu_active();
       if (!achievements_menu_active())
-        ctrlMenu();
+      ctrlMenu();
     }
   }
 

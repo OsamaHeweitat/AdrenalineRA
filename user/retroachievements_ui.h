@@ -69,4 +69,7 @@ void update_progress_indicator(const char* progress, float percent);
 void hide_progress_indicator(void);
 void draw_progress_indicator(void);
 
+// Query if any RA overlays are currently active (notifications, menus, trackers, indicators)
+int ra_overlays_active(void);
+
 #endif // RETROACHIEVEMENTS_UI_H

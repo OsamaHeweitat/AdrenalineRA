@@ -578,3 +578,36 @@ void draw_challenge_indicators(void) {
         }
     }
 }
+
+int ra_overlays_active(void) {
+    // Check transient notifications
+    if ((g_notification_msg[0] && sceKernelGetProcessTimeWide() < g_notification_until) ||
+        (g_notification_top_right_msg[0] && sceKernelGetProcessTimeWide() < g_notification_top_right_until)) {
+        return 1;
+    }
+    // Achievements menu
+    if (g_show_achievements_menu) {
+        return 1;
+    }
+    // Progress indicator
+    if (g_progress_indicator.active && sceKernelGetProcessTimeWide() < g_progress_indicator.until) {
+        return 1;
+    }
+    // Any active tracker
+    for (int i = 0; i < MAX_TRACKERS; ++i) {
+        if (g_trackers[i].active) {
+            return 1;
+        }
+    }
+    // Any active challenge indicator
+    for (int i = 0; i < g_challenge_indicators.count; ++i) {
+        if (g_challenge_indicators.indicators[i].active) {
+            return 1;
+        }
+    }
+    // Pending notification queued (will trigger soon)
+    if (g_pending_notification.pending) {
+        return 1;
+    }
+    return 0;
+}

@@ -41,6 +41,13 @@ static u32 g_deadzone_tick = 0;
 
 extern u32 button_assign_value;
 extern Entry plugins_tool_entries[MAX_PLUGINS + 1];
+static int HardcoreMarkerPresent()
+{
+	SceIoStat st;
+	memset(&st, 0, sizeof(SceIoStat));
+	return (sceIoGetstat("ms0:/RA_HARDCORE", &st) >= 0);
+}
+
 
 Theme themes[] = {
   // Default (done)
@@ -359,6 +366,17 @@ void ChangeValue(int interval)
 {
   if (pages[sel_page].entries[sel].options)
   {
+		// prevent changing plugin settings while hardcore mode in retroachievements is active; always force disabled
+		int *valptr = pages[sel_page].entries[sel].value;
+		if (HardcoreMarkerPresent() && (valptr == &config.notusexmbplugins || valptr == &config.notusegameplugins || valptr == &config.notusepopsplugins))
+		{
+			config.notusexmbplugins = 1;
+			config.notusegameplugins = 1;
+			config.notusepopsplugins = 1;
+			ShowDialog("Disabled in Hardcore");
+			return;
+		}
+
     int max = pages[sel_page].entries[sel].size_options / sizeof(char **);
     (*pages[sel_page].entries[sel].value) = (max + (*pages[sel_page].entries[sel].value) + interval) % max;
   }

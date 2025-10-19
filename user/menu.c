@@ -236,12 +236,18 @@ int ExitAdrenalineMenu() {
   finishStates();
 
   if(old_config.hardcore_mode == 0 && config.hardcore_mode == 1) {
-    // If hardcore mode was enabled, restart the app (well, exit it)
+    // If hardcore mode was enabled, create marker for PSP-side to enforce plugin disabling
+    SceUID fd = sceIoOpen("ux0:/pspemu/RA_HARDCORE", SCE_O_WRONLY | SCE_O_CREAT | SCE_O_TRUNC, 0777);
+    if (fd >= 0)
+      sceIoClose(fd);
+    // Restart the app (well, exit it)
     ScePspemuErrorExit(0);
   }
 
   // TODO: reset the rc_client instead of the entire emu
   if(old_config.hardcore_mode == 1 && config.hardcore_mode == 0) {
+    // If hardcore mode was disabled, remove marker
+    sceIoRemove("ux0:/pspemu/RA_HARDCORE");
     ScePspemuErrorExit(0);
   }
 

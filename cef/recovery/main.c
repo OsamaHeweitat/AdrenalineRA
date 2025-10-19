@@ -227,6 +227,15 @@ int main(int argc, char *argv[]) {
 
 	sctrlSEGetConfig(&config);
 	SetRecoveryColor(config.recoverycolor);
+  {
+    SceIoStat st;
+    memset(&st, 0, sizeof(SceIoStat));
+    if (sceIoGetstat("ms0:/RA_HARDCORE", &st) >= 0) {
+      config.notusexmbplugins = 1;
+      config.notusegameplugins = 1;
+      config.notusepopsplugins = 1;
+    }
+  }
 	MainMenu();
 
 	while (!recovery_exit) {

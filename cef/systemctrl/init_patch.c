@@ -210,16 +210,24 @@ int sceKernelStartModulePatched(SceUID modid, SceSize argsize, void *argp, int *
 
 				int type = sceKernelInitKeyConfig();
 
+				// If RA hardcore marker exists, suppress all plugins regardless of config
+				int ra_hardcore = 0;
+				{
+					SceIoStat st;
+					memset(&st, 0, sizeof(SceIoStat));
+					ra_hardcore = (sceIoGetstat("ms0:/RA_HARDCORE", &st) >= 0);
+				}
+
 				if (type == PSP_INIT_KEYCONFIG_VSH && !sceKernelFindModuleByName661("scePspNpDrm_Driver")) {
 					goto START_MODULE;
 				}
 
 				char *file = NULL;
-				if (type == PSP_INIT_KEYCONFIG_VSH && !config.notusexmbplugins) {
+				if (type == PSP_INIT_KEYCONFIG_VSH && !config.notusexmbplugins && !ra_hardcore) {
 					file = "ms0:/seplugins/vsh.txt";
-				} else if (type == PSP_INIT_KEYCONFIG_GAME && !config.notusegameplugins) {
+				} else if (type == PSP_INIT_KEYCONFIG_GAME && !config.notusegameplugins && !ra_hardcore) {
 					file = "ms0:/seplugins/game.txt";
-				} else if (type == PSP_INIT_KEYCONFIG_POPS && !config.notusepopsplugins) {
+				} else if (type == PSP_INIT_KEYCONFIG_POPS && !config.notusepopsplugins && !ra_hardcore) {
 					file = "ms0:/seplugins/pops.txt";
 				}
 

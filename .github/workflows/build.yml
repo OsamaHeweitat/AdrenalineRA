@@ -1,0 +1,234 @@
+name: Build Check
+on:
+  push:
+    paths-ignore:
+      - 'readme.md'
+      - 'todo.md'
+      - 'LICENSE'
+      - 'Dockerfile'
+      - '**/README.md'
+      - 'docs/**'
+    branches: [ master, dev ]
+  pull_request:
+    paths-ignore:
+      - 'readme.md'
+      - 'todo.md'
+      - 'LICENSE'
+      - 'Dockerfile'
+      - '**/README.md'
+      - 'docs/**'
+
+jobs:
+  prepare:
+    name: Setup Compilation Environment
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+
+    steps:
+      - name: Install Dependencies
+        run: |
+         sudo apt-get update
+         sudo apt-get install build-essential cmake pkgconf libreadline8 libusb-0.1 libgpgme11 libarchive-tools fakeroot python3 wget
+
+      - name: Install Dependencies 2
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+
+      - name: Pre-setups
+        run: |
+          sudo mkdir -p /usr/local/pspdev
+          echo "VITASDK=/usr/local/vitasdk" >> $GITHUB_ENV
+          echo "/usr/local/vitasdk/bin" >> $GITHUB_PATH
+          echo "PSPDEV=/usr/local/pspdev" >> $GITHUB_ENV
+          echo "/usr/local/pspdev/bin" >> $GITHUB_PATH
+
+        # FIXME: Return to this once TAI_CONTINUE is fixed with gcc 15
+        #   - name: Setup VITASDK
+        #     run: |
+        #       git clone https://github.com/vitasdk/vdpm
+        #       cd vdpm
+        #       ./bootstrap-vitasdk.sh
+        #       vdpm henkaku taihen libpng libjpeg-turbo freetype
+
+      - name: Setup VITASDK
+        run: |
+          wget -q https://github.com/vitasdk/autobuilds/releases/download/master-linux-v2.529/vitasdk-x86_64-linux-gnu-2025-03-11_15-12-52.tar.bz2
+          sudo tar -xjf vitasdk-x86_64-linux-gnu-2025-03-11_15-12-52.tar.bz2 -C /usr/local/
+          vdpm henkaku taihen libpng libjpeg-turbo freetype
+
+      - name: Setup PSPSDK
+        run: |
+          wget -q https://github.com/pspdev/pspdev/releases/download/latest/pspdev-ubuntu-latest-x86_64.tar.gz
+          sudo tar -xzf pspdev-ubuntu-latest-x86_64.tar.gz -C /usr/local/
+          sudo chmod -R 755 /usr/local/pspdev
+
+      - name: Setup psp-packer
+        run: |
+          git clone https://github.com/VitaArchive/psp-packer.git
+          cd psp-packer
+          cargo build --release --target-dir=target --quiet
+          sudo cp target/release/psp-packer /usr/local/pspdev/bin
+
+      - name: Upload Environment
+        uses: actions/upload-artifact@v6
+        with:
+          name: environ
+          compression-level: 3
+          retention-days: 1
+          path: |
+            /usr/local/vitasdk/
+            /usr/local/pspdev/
+
+
+  build:
+    name: Build Adrenaline
+    runs-on: ubuntu-latest
+    needs: prepare
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Prepare Environment - Part 1
+        uses: actions/download-artifact@v7
+        with:
+          name: environ
+          path: local/
+
+      - name: Prepare Environment - Part 2
+        id: vars
+        run: |
+          chmod -R 755 $(pwd)/local/
+          echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          echo "VITASDK=$(pwd)/local/vitasdk" >> $GITHUB_ENV
+          echo "$(pwd)/local/vitasdk/bin" >> $GITHUB_PATH
+          echo "PSPDEV=$(pwd)/local/pspdev" >> $GITHUB_ENV
+          echo "$(pwd)/local/pspdev/bin" >> $GITHUB_PATH
+          echo "USE_PSP_PACKER=1" >> $GITHUB_ENV
+        #   echo "USE_OLD_BOOTLOADEX=1" >> $GITHUB_ENV
+
+      - name: Set Nightly Version
+        run: |
+          sha="${{ steps.vars.outputs.sha_short }}"
+          sed -r -i "s|^(#define[[:space:]]+EPI_NIGHTLY_VER[[:space:]]+\")([0-9]+)(\")|\1${sha}\3|" adrenaline_version.h
+
+      - name: Build eCFW
+        run: |
+            psp-cmake -S cef -B cef/build -DCMAKE_BUILD_TYPE=Release -DNIGHTLY=1
+            cmake --build cef/build -j
+
+      - name: Build VPK
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCEF_CMAKE=1 -DNIGHTLY=1
+          cmake --build build
+          mv build/bubble/Adrenaline.vpk build/bubble/Adrenaline-${{ steps.vars.outputs.sha_short }}.vpk
+
+      - name: Upload VPK
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        uses: actions/upload-artifact@v6
+        with:
+          name: epi-vpk
+          path: build/bubble/Adrenaline-${{ steps.vars.outputs.sha_short }}.vpk
+          compression-level: 0
+
+      - name: Build UPDATER
+        run: |
+          cmake --build build --target updater -j
+          zip -r build/updater-${{ steps.vars.outputs.sha_short }}.zip build/updater
+
+      - name: Upload UPDATER
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        uses: actions/upload-artifact@v6
+        with:
+          name: epi-updater
+          path: build/updater-${{ steps.vars.outputs.sha_short }}.zip
+          compression-level: 0
+
+
+  build-debug:
+    name: Build Adrenaline with DEBUG
+    runs-on: ubuntu-latest
+    needs: prepare
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Prepare Environment - Part 1
+        uses: actions/download-artifact@v7
+        with:
+          name: environ
+          path: local/
+
+      - name: Prepare Environment - Part 2
+        id: vars
+        run: |
+          chmod -R 755 $(pwd)/local/
+          echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          echo "VITASDK=$(pwd)/local/vitasdk" >> $GITHUB_ENV
+          echo "$(pwd)/local/vitasdk/bin" >> $GITHUB_PATH
+          echo "PSPDEV=$(pwd)/local/pspdev" >> $GITHUB_ENV
+          echo "$(pwd)/local/pspdev/bin" >> $GITHUB_PATH
+          echo "USE_PSP_PACKER=1" >> $GITHUB_ENV
+        #   echo "USE_OLD_BOOTLOADEX=1" >> $GITHUB_ENV
+
+      - name: Set Nightly Version
+        run: |
+          sha="${{ steps.vars.outputs.sha_short }}"
+          sed -r -i "s|^(#define[[:space:]]+EPI_NIGHTLY_VER[[:space:]]+\")([0-9]+)(\")|\1${sha}\3|" adrenaline_version.h
+
+
+      - name: Build eCFW
+        run: |
+            psp-cmake -S cef -B cef/build -DNIGHTLY=1 -DSYSTEMCTRL_DEBUG=3 -DPENTAZEMIN_DEBUG=3
+            cmake --build cef/build -j
+
+      - name: Build VPK
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCEF_CMAKE=1 -DNIGHTLY=1
+          cmake --build build
+          mv build/bubble/Adrenaline.vpk build/bubble/Adrenaline-${{ steps.vars.outputs.sha_short }}-DEBUG.vpk
+
+      - name: Upload VPK
+        uses: actions/upload-artifact@v6
+        with:
+          name: epi-vpk-debug
+          path: build/bubble/Adrenaline-${{ steps.vars.outputs.sha_short }}-DEBUG.vpk
+          compression-level: 0
+
+  release-nightly:
+    name: Release Nightly
+    runs-on: ubuntu-latest
+    needs: [build, build-debug]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    permissions: write-all
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Variables
+        id: vars
+        run: |
+          echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Download Artifacts
+        uses: actions/download-artifact@v7
+        with:
+          pattern: epi-*
+          path: build/
+
+      - name: Create tag
+        id: create_tag
+        run: |
+          echo "TAG=v$(date +%s)" >> $GITHUB_OUTPUT
+
+      - name: Upload Nightly Release
+        id: create_release
+        continue-on-error: true
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.create_tag.outputs.TAG }}
+          name: "Nightly: ${{ github.sha }}"
+          prerelease: true
+          files: |
+              build/epi-vpk/Adrenaline-${{ steps.vars.outputs.sha_short }}.vpk
+              build/epi-vpk-debug/Adrenaline-${{ steps.vars.outputs.sha_short }}-DEBUG.vpk
+              build/epi-updater/updater-${{ steps.vars.outputs.sha_short }}.zip

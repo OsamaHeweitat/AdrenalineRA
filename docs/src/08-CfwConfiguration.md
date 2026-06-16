@@ -1,0 +1,376 @@
+# Epinephrine Custom Firmware Settings
+---
+
+Epinephrine CFW has several settings options that modify the behavior of the system. The settings can be split in two categories: `General Settings` and `Advanced Settings`.
+
+You can use the [XMB](./10-XmbCfwMenus.md#-adrenaline-cfw-settings) or the [Recovery Menu](./09-RecoveryMenu.md) to easily modify the CFW settings.
+
+> [!CAUTION]
+> Not to be confused with [`Adrenaline Application Settings`](./03-AdrenalineMenu/02-AdrenalineSettings.md), which is another thing.
+
+## General Settings
+---
+
+### CPU/BUS clock speed in XMB
+
+Configures the CPU/BUS clock speed on when the system is on the XMB/VSH.
+
+#### Options:
+
+- `Default`: Same as `222/111` option
+- `20/10`
+- `75/37`
+- `100/50`
+- `133/66`
+- `222/111`
+- `266/133`
+- `300/150`
+- `333/166`
+
+### CPU/BUS clock speed in PSP game/app
+
+Configures the CPU/BUS clock speed on when the system is running a PSP game, PSP app or PSP homebrew.
+
+#### Options:
+
+- `Default`: Game/app dependant
+- `20/10`
+- `75/37`
+- `100/50`
+- `133/66`
+- `222/111`
+- `266/133`
+- `300/150`
+- `333/166`
+
+### UMDemu ISO driver
+
+Configures the UMDemu driver to use with `ISO` and `Compressed ISO` games.
+
+#### Options:
+
+- `Inferno`
+- `March33`
+- `Sony NP9660`
+
+### Skip Sony logo on coldboot
+
+When enabled, skip the "Sony Computer Entertainment" logo when starting the system.
+
+### Skip Sony logo on gameboot
+
+When enabled, skip the "PSP" logo when starting an PSP game/app.
+
+### Hide corrupt icons in game menu
+
+When enabled, hides corrupt icons in the game menu.
+
+Corrupt icons happens in the case a game folder does not contain an `EBOOT.PBP` file.
+
+### Hide DLCs in game menu
+
+When enabled, hides DLC from showing up as duplicate games when you have DLC installed for your ISO game.
+
+### Hide PIC0/PIC1 in game menu
+
+Controls whether to stops displaying PIC0 and/or PIC1 images on XMB, allowing quicker response time to show the game list.
+
+#### Options:
+
+- `Disabled`: Do not hide PIC0 and PIC1
+- `Both`: Hides both PIC0 and PIC1
+- `PIC0 Only`: Hides only the PIC0 ("Title/Information image")
+- `PIC1 Only`: Hides only the PIC1 ("Background image")
+
+### Hide MAC address
+
+When enabled, hides the MAC address from the `Settings > System Settings > System Information`.
+
+### Hide CFW files in PSP games
+
+When enabled, hides the CFW files from being seem or modified by PSP games.
+
+This is not applied to homebrew games/apps or custom updater, even if the option is enabled.
+
+> [!CAUTION]
+> This option does affect **signed** homebrew games/apps (homebrew signed to work on PSP OFW) as signed homebrew is launched in the same way as an official PSP game.
+>
+> For this reason, if you have a homebrew software that only comes signed and it needs to access CFW files, you can disable this option.
+
+
+### Autorun /PSP/GAME/BOOT/EBOOT.PBP
+
+When enabled, the system automatically launches the game/app int the `???0:/pspemu/PSP/GAME/BOOT/EBOOT.PBP`.
+
+### Fake VSH Region
+
+Modifies the perceived region on XMB/VSH, allowing to unlock region-specific apps and features.
+
+#### Options:
+
+- `Disabled`
+- `Japan`
+- `America`
+- `Europe`
+- `Korea`
+- `United Kingdom`
+- `Mexico`
+- `Australia/NZ`
+- `East`
+- `Taiwan`
+- `Russia`
+- `China`
+- `Debug Type I`
+- `Debug Type II`
+
+### Extended screen colors mode
+
+Modifies the system to use a extended color space based on the configuration.
+
+#### Options:
+
+- `Disabled`
+- `02g`: Use the same color space as the PSP-2000. More vibrant colors, cooler color tone.
+- `03g`: Use the same color space as the PSP-3000. More vibrant colors, warmer color tone.
+
+### Use Sony PSP OSK
+
+When enabled, makes the system to use the PSP On Screen Keyboard (OSK) instead of the VITA/PSTV native OSK.
+
+### Memory Stick Cache
+
+When enabled, the system will use a cache in I/O operations of the Memory Stick drive (`ms0:`) to improve speed.
+
+### NoDRM engine
+
+Controls whether to patch the DRM engine of the PSP system.
+
+When enabled, the system will allow to launch application, homebrews and games without a valid license.
+
+### XMB Control
+
+Controls whether to load the extra CFW menus on XMB/VSH.
+
+When enabled, the menus will show up in the XMB in the `Settings` section.
+
+### Recovery color
+
+Configures the color of the Recovery Menu.
+
+
+## Advanced Settings
+---
+
+Advanced settings are called that for a reason. They provide powerful options that can significantly alter system behavior, stability, or compatibility. These settings are intended for experienced users and tinkerers exploring the best set of configuration for cases of bad compatibility with apps and games (anti-CFW checks, slowdowns not solved by general settings, etc).
+
+Incorrect configuration may lead to unexpected issues, so proceed with caution and consult documentation or community resources if unsure.
+
+> [!TIP]
+> On the XMB CFW menu, advanced settings are marked with the `▲` symbol.
+
+### Force high memory layout
+
+Controls whether to force the unlock extra RAM space for the user-space RAM partition, that can be used by games and apps.
+
+#### Options:
+
+- `Disabled`: With this option, no specific memory layout is forced.
+	- By default, user RAM partition gets the standard 24MB.
+	- Homebrew games/apps can request other layout by using the `MEMSIZE` in their `SFO` information or by using the CFW API.
+	- Plugin author can use the CFW API to request changing the layout.
+- `Stable`: The stable amount of extra RAM is made available to the user RAM partition, a total of 40MB.
+	- When this options is set, it truly forces it, any requests to modify it will result in it being "ignored" (the CFW API returns an error informing that is not possible to modify the memory layout).
+- `Max`: Makes the maximum possible of RAM available to the user RAM partition, a total of 52MB, at the cost of potential instabilities.
+	- When this options is set, it truly forces it, any requests to modify it will result in it being "ignored" (the CFW API returns an error informing that is not possible to modify the memory layout).
+
+
+> [!WARNING] Max Option Warning
+> Some important stuff for the VITA's PSPemu are put in this region of memory. Although Epinephrine protects the sub-region that was already identified, those last 16MB region usage was not yet completely investigated and reversed. That means that some system instabilities may occur once things start to be allocated on this region.
+
+### Fake max free memory
+
+Controls wether to limit the reported maximum free memory and how much to limit from `sceKernelMaxFreeMemSize` on a title.
+
+Any option other than `Auto` will always use that value, regardless of existent game patches and fixes.
+
+#### Options:
+
+- `Auto`: Disabled by default, but also can change based on automatic game patches and fixes (often related to high memory layout instabilities)
+- `16MB`: Set the maximum value to 16MB
+- `24MB`: Set the maximum value to 24MB (Maximum User RAM)
+- `32MB`: Set the maximum value to 32MB (Max Kernel + Max User RAM)
+- `40MB`: Set the maximum value to 40MB (Max Stable high memory layout User RAM)
+- `48MB`: Set the maximum value to 48MB (Max Kernel + Max Stable high memory layout User RAM)
+- `52MB`: Set the maximum value to 52MB (Max "Max" high memory layout User RAM)
+- `60MB`: Set the maximum value to 60MB (Max Kernel + Max "Max" high memory layout User RAM)
+- `64MB`: Set the maximum value to 64MB (Max PSP RAM, probably not very useful)
+
+> [!WARNING]
+> This option is very unstable on non-`Auto` values, i.e. it can easily break many titles with both low and high values.
+>
+> This options is made available to facilitate exploratory tests with games that breaks with high memory layout or similar issues.
+
+> [!CAUTION]
+> Some games may require more specific values to make then stable on high memory layout (e.g. Rainbow Six: Vegas). In case none of the options helps with crashes, create/open/upvote an issue on the [project issue tracer](https://github.com/isage/Adrenaline/issues) (but also check first to avoid opening duplicated issue tracker).
+
+### Use Graphic Engine 2
+
+Controls wether to load an alternative implementation of the Graphic Engine module, i.e. loads `ge_2.prx` instead of `ge.prx`.
+
+This is a CFW option made available to tinkerers to explore possible improvement options for apps/games (considering that native PSPemu has similar options for compatibility with officially released PSP titles on VITA). But it is also an advanced option as it may also cause regressions and/or issues with apps/games.
+
+> [!NOTE]
+> The modules being called "2" doesn't mean it is a improved version, but rather a poorly named alternative version to be used as compatibility fixer for a small number of officially released titles.
+>
+> So it is a direct effect of a bad naming because programmers (usually with tight deadlines) are bad at naming things that are very similar in functionality with another existing thing, more so in a thing that is not supposed to be known by end-users... Been there, done that LOL.
+
+> [!NOTE] Note 2
+> This option does not affect the XMB/VSH. Even if this option is enabled, the XMB/VSH will be loaded with the usual implementation of the Graphic Engine module.
+
+### Use Media Engine 2
+
+Controls wether to load an alternative implementation of the Media Engine module, i.e. loads `kermit_me_wrapper_2.prx` instead of `kermit_me_wrapper.prx`.
+
+This is a CFW option made available to tinkerers to explore possible improvement options for apps/games (considering that native PSPemu has similar options for compatibility with officially released PSP titles on VITA). But it is also an advanced option as it may also cause regressions and/or issues with apps/games.
+
+> [!NOTE]
+> The modules being called "2" doesn't mean it is a improved version, but rather a poorly named alternative version to be used as compatibility fixer for a small number of officially released titles.
+>
+> So it is a direct effect of a bad naming because programmers (usually with tight deadlines) are bad at naming things that are very similar in functionality with another existing thing, more so in a thing that is not supposed to be known by end-users... Been there, done that LOL.
+
+> [!NOTE] Note 2
+> This option does not affect the XMB/VSH. Even if this option is enabled, the XMB/VSH will be loaded with the usual implementation of the Media Engine module.
+
+### Execute BOOT.BIN in UMDemu ISO
+
+This configuration makes the the system to execute `BOOT.BIN` file instead of `EBOOT.BIN` when launching ISO game/apps.
+
+In the case of the ISO game/apps not having a `BOOT.BIN` file, it will fallback to `EBOOT.BIN`.
+
+> [!WARNING]
+> Enabling this configuration will make many games that have invalid `BOOT.BIN` file to not run (black screen, exit with error, or even PSPemu crash).
+>
+> An better alternative is to launch know apps that need to execute `BOOT.BIN` to work (mostly ISO of demos, prototypes, and modded games) holding the `R` button. That will cause to execute `BOOT.BIN` without changing the configuration and **not** affecting all the ISO game/apps you have.
+
+### Inferno ISO cache policy
+
+Configures what cache policy the `Inferno` UMDemu driver will use for its overall cache (also known as `Inferno Cache`).
+
+#### Options:
+
+- `LRU`: Least Recently Used policy. Uses less cpu cycles because it will discards the cache slot from the queue that have not been used in a timeframe when new cache item needs to be added.
+- `RR`: Random Replacement policy. Uses slightly less memory as it doesn't need to keep track of data related to cache slots usage. It can be beneficial for uniform or streaming reading patterns.
+
+> [!WARNING]
+> If you didn't understood the brief explanation, do not change this setting. The default setting (`LRU`) is already the better option for games in general.
+
+### Inferno ISO cache number
+
+Configures how many caches the `Inferno` UMDemu driver will use for `Inferno Cache`.
+
+This could improve the execution of a game/app at the cost of using more memory.
+
+Any option other than `Auto` will always use that value for all ISO games and apps launched with the `Inferno` driver.
+
+#### Options:
+
+- `Auto`: Uses the default value `32`, but also can change based on automatic game patches and fixes, including totally disabling Inferno Cache.
+- `1`
+- `2`
+- `4`
+- `8`
+- `16`
+- `32`
+- `64`
+- `128`
+
+### Inferno ISO cache size
+
+Configures the size of cache the `Inferno` UMDemu driver will use for `Inferno Cache`.
+
+This also could improve the execution of a game/app at the cost of using more memory.
+
+Any option other than `Auto` will always use that value for all ISO games and apps launched with the `Inferno` driver.
+
+#### Options:
+
+- `Auto`: Uses the default value `32KB`, but also can change based on automatic game patches and fixes, including totally disabling Inferno Cache.
+- `1KB`
+- `2KB`
+- `4KB`
+- `8KB`
+- `16KB`
+- `32KB`
+- `64KB`
+
+> [!WARNING]
+> Putting the biggest values for **Inferno ISO cache number** and **Inferno ISO cache size** will use half of the stable extra RAM (8MB).
+>
+> Even though what is left is more than enough for most plugin configurations, if you have a crazy amounts of plugins that uses a lots of memory, memory starvation will happen.
+
+### UMDemu ISO seek time delay factor
+
+Epinephrine's UMDemu drivers have the ability to simulate the seek time for the disc reader reach to an disc offset before reading and retrieving data that would happen when reading a physical UMD.
+
+This setting allows to control a factor of how much **slower** is that seek time simulation.
+
+This can be used to bypass the anti-CFW checks in some games and fix desynchronization issues on some other games. Epinephrine automatically sets for games known to have those checks and/or desync issues when both seek and [read](./08-CfwConfiguration.md#umdemu-iso-read-speed-delay-factor) time are set to `Auto`.
+
+#### Option:
+
+- `Auto`: Disabled by default, but also can change based on automatic game patches and fixes. If `UMDemu ISO read speed delay factor` is different than `Auto`, it is interpreted as `0x` (i.e. no seek time delays).
+- `1x`
+- `2x`
+- `3x`
+- `4x`
+
+> [!WARNING]
+> Do not forget to re-set to `Auto` before launching a ISO game/app that do not need this configured to avoid performance penalties on games that do not need it.
+
+### UMDemu ISO read speed delay factor
+
+Epinephrine's UMDemu drivers have the ability to simulate the **slower** read speed of a physical UMD.
+
+This setting allows to control a factor of how much **slower** is that read speed simulation.
+
+This can be used to bypass the anti-CFW checks in some games and fix desynchronization issues on some other games. Epinephrine automatically sets for games known to have those checks and/or desyc issues when both [seek](./08-CfwConfiguration.md#umdemu-iso-seek-time-delay-factor) and read time are set to `Auto`.
+
+#### Option:
+
+- `Auto`: Disabled by default, but also can change based on automatic game patches and fixes. If `UMDemu ISO seek speed delay factor` is different than `Auto`, it is interpreted as `0x` (i.e. no read time delays).
+- `1x`
+- `2x`
+- `3x`
+- `4x`
+
+> [!WARNING]
+> Do not forget to re-set to `Auto` before launching a ISO game/app that do not need this configured to avoid performance issues.
+
+
+> [!WARNING]
+> When using the `Inferno` driver, setting **any** of the **UMDemu ISO seek time delay factor** and the **UMDemu ISO read speed delay factor** settings to any value other than `Auto` will consequently disable the `Inferno Cache` feature of the driver.
+>
+> This can reduce greatly the performance of executing ISO games/apps that do not need them configured if you forget to return them to `Auto`.
+
+### TTY redirection
+
+Controls whether to redirect TTY stdout to VITA-side.
+
+If enabled, the stdout of the vPSP-side is redirected to the VITA-side. There, they can be used for remote logging (CatLog and similar homebrews), for example.
+
+> [!CAUTION]
+> When enabled, you may find regression on game or homebrew performance if they do excessive outputs to the stdout (usually for debug).
+>
+> CFW modules can also do excessive outputs to stdout when compiled with higher DEBUG levels, and that also can affect title performance.
+
+### XMB plugins
+
+Controls whether to load plugins on XMB/VSH.
+
+### GAME plugins
+
+Controls whether to load plugins on PSP game/apps.
+
+### POPS plugins
+
+Controls whether to load plugins on PS1 game/apps.

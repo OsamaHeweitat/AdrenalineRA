@@ -4,23 +4,23 @@
 	<livearea-background>
 		<image>bg.png</image>
 	</livearea-background>
-	
+
 	<gate>
 		<startup-image>startup.png</startup-image>
 	</gate>
-	
+
 	<frame id="frame2">
 		<liveitem>
 			<text valign="bottom" align="left" text-align="left" text-valign="bottom" line-space="3" ellipsis="on">
-				<str color="#ffffff" size="50" bold="on" shadow="on">Adrenaline 7.1.7</str>
+				<str color="#ffffff" size="50" bold="on" shadow="on">Adrenaline 8.0.0</str>
 			</text>
 		</liveitem>
 	</frame>
-	
+
 	<frame id="frame3">
 		<liveitem>
 			<text valign="top" align="left" text-align="left" text-valign="top" line-space="2" ellipsis="on">
-				<str size="22" shadow="on">by TheFloW</str>
+				<str size="22" shadow="on">by Cat and GrayJack</str>
 			</text>
 		</liveitem>
 	</frame>

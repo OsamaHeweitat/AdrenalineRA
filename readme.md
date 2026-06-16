@@ -11,15 +11,18 @@ inject custom code into the IPL which allows unsigned code to run at boottime.
 
 How to update
 -------------
-If you have already been using Adrenaline, simply open Adrenaline.vpk as zip file and copy all modules from sce_module to ux0:app/PSPEMUCFW/sce_module.  
-Alternatively, use "System update" from XMB and follow instructions.
+If you have already been using Adrenaline, simply open Adrenaline.vpk as zip file and copy all modules from sce_module to `ux0:app/PSPEMUCFW/sce_module`.
+
+Alternatively, you can download [this file](http://adrenaline.sarcasticat.com/EBOOT.PBP) and use [VitaShell](https://github.com/RealYoti/VitaShell/releases) to copy it to the `ux0:/pspemu/PSP/GAME/UPDATE/` directory. Afterwards, launch Adrenaline and run the update application.
+
+If you already installed 7.1.0 or later, you can also use the 'System Update' button from the XMB to download the update with the console itself.
 
 How to install
 --------------
 Please only do this approach for a fresh installation, otherwise please refer to the guide above.
 
 1. Remove the Adrenaline bubble and the `ux0:app/PSPEMUCFW/sce_module/adrenaline_kernel.skprx` path from the taiHEN config.txt and finally reboot your device.
-2. Download [Adrenaline.vpk](https://github.com/TheOfficialFloW/Adrenaline/releases) and install it using [VitaShell](https://github.com/TheOfficialFloW/VitaShell/releases).
+2. Download [Adrenaline.vpk](https://github.com/isage/Adrenaline/releases) and install it using [VitaShell](https://github.com/RealYoti/VitaShell/releases).
 3. Launch Adrenaline and press ❌ to download the 6.61 firmware. After finishing it will automatically terminate.
 4. Relaunch Adrenaline, this time it will go into pspemu mode. Follow the instructions on screen.
 
@@ -86,8 +89,8 @@ Changelog
 ### Changelog v6.8
 - Added sharp bilinear without scanlines filter. Thanks to rsn8887.
 - Fixed PS1 slowdowns. Thanks to rsn8887.
-- Fixed compatiblity with h-encore 2.0.
-- Fixed compatiblity with udcd_uvc.skprx plugin.
+- Fixed compatibility with h-encore 2.0.
+- Fixed compatibility with udcd_uvc.skprx plugin.
 
 ### Changelog v6.7
 - Added support for PS1 multiplayer on PS Vita using an upcoming DS3/DS4 plugin.
@@ -119,7 +122,7 @@ Changelog
 - Added f.lux by Rinnegatamante.
 - Fixed PS1 framerate when using custom screen.
 - Fixed bug where exiting a game with 'High memory layout' would crash.
-- Fixed compatiblity with 'Kingdom Hearts: Birth by Sleep' english patch, again.
+- Fixed compatibility with 'Kingdom Hearts: Birth by Sleep' english patch, again.
 
 ### Changelog v6.1
 - Added support for 3.65/3.67.
@@ -161,11 +164,11 @@ Changelog
 ### Changelog v4
 - Added custom graphics filtering support for PS1 games.
 - Added screen mode adjustment for PS1 games. If you're using this feature on a PS Vita, select 'Original' screen mode in the
-offical settings, then apply the custom screen mode. On the other hand, if you want to the screen mode of the official settings,
+official settings, then apply the custom screen mode. On the other hand, if you want to the screen mode of the official settings,
 	select 'Original' screen mode in Adrenaline settings. On a PS TV this will finally allow you to play your games in fullscreen.
 - Added screenshot support in PS1 games.
 - Added network update feature for future updates.
-- Fixed a bug in msfs driver that caused weird behaviour in XMB after resuming from standby.
+- Fixed a bug in msfs driver that caused weird behavior in XMB after resuming from standby.
 - Removed 'Official' graphics filtering in order to support the features mentioned above.
 
 ### Changelog v3.1
@@ -181,7 +184,7 @@ offical settings, then apply the custom screen mode. On the other hand, if you w
 ### Changelog v3
 - Added ability to launch PS1 games from XMB and play them with full sound.
 - Added ability to save and load states using the 'States' tab in the Adrenaline menu.
-- Added possiblity to connect USB in XMB and added 'Toggle USB' option to recovery menu.
+- Added possibility to connect USB in XMB and added 'Toggle USB' option to recovery menu.
 - Added ability to return to livearea by double tapping the PS button.
 - Added Adrenaline startup image designed by Freakler.
 - Added option to force high memory layout. For 'The Elder Scrolls Travels: Oblivion' Demo.
@@ -209,19 +212,17 @@ offical settings, then apply the custom screen mode. On the other hand, if you w
 ## Dependencies
 - [pspsdk](https://pspdev.github.io/) + psp-packer binary in your $PATH
 - [vitasdk](https://vitasdk.org/)
-- [vita2dlib-fbo](https://github.com/frangarcj/vita2dlib/tree/fbo)
-- [vita-shader-collection](https://github.com/frangarcj/vita-shader-collection)
-- python3
+- [python3](https://www.python.org/downloads/)
 
 ## Building
-- `cd cef && make && cd ..`
-- `cmake -S . -B build -DCMAKE_BUILD_TYPE=Release`
+- `psp-cmake -S cef -B cef/build -DCMAKE_BUILD_TYPE=Release`
+- `cmake --build cef/build`
+- `cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCEF_CMAKE=1`
 - `cmake --build build`
 - grab VKP from `build/bubble/`
 
 ## Building updater
 - Build adrenaline (sse above)
-- `cmake --build build --target updater`
 - (optionally) modify `cef/updater/psp-updatelist.template`
-- `cd cef/updater && make`
-- resulting files are `EBOOT.PBP` and `psp-updatelist.txt`
+- `cmake --build build --target updater`
+- resulting files are `EBOOT.PBP` and `psp-updatelist.txt` at `build/updater`

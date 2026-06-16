@@ -1,0 +1,107 @@
+/*
+ * This file is part of PRO CFW.
+
+ * PRO CFW is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+
+ * PRO CFW is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with PRO CFW. If not, see <http://www.gnu.org/licenses/ .
+ */
+
+#include <string.h>
+
+#include <pspreg.h>
+#include <pspumd.h>
+#include <psprtc.h>
+#include <pspsysmem.h>
+#include <pspkernel.h>
+#include <pspsysevent.h>
+
+#include <cfwmacros.h>
+#include <systemctrl.h>
+#include <systemctrl_se.h>
+
+#define _ADRENALINE_LOG_IMPL_
+#include <adrenaline_log.h>
+
+#include "inferno.h"
+
+PSP_MODULE_INFO("EPI-InfernoDriver", 0x1000, 2, 2);
+
+u32 psp_model;
+u32 psp_fw_version;
+
+int sceKernelSetQTGP3(void *data);
+
+u8 g_umddata[16] = {
+	0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+	0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+};
+
+extern int power_event_handler(int ev_id, char *ev_name, void *param, int *result);
+
+PspSysEventHandler g_power_event = {
+	.size = sizeof(g_power_event),
+	.name = "infernoSysEvent",
+	.type_mask = 0x00FFFF00, // both suspend / resume
+	.handler = &power_event_handler,
+};
+
+int setup_umd_device(void) {
+	isoSetUmdFile(sctrlSEGetUmdFile());
+
+	infernoSetDiscType(sctrlSEGetDiscType());
+
+	int ret = sceIoAddDrv(&g_iodrv);
+
+	if (ret < 0) {
+		return ret;
+	}
+
+	sceKernelSetQTGP3(g_umddata);
+	ret = 0;
+
+	return ret;
+}
+
+int init_inferno(void) {
+	g_drive_status = PSP_UMD_INITING;
+	g_umd_cbid = -1;
+	g_umd_error_status = 0;
+	if (g_drive_status_evf < 0) g_drive_status_evf = sceKernelCreateEventFlag("SceMediaManUser", 0x201, 0, NULL);
+	sceKernelRegisterSysEventHandler(&g_power_event);
+
+	return MIN(g_drive_status_evf, 0);
+}
+
+int module_start(SceSize args, void* argp) {
+	logInit("ms0:/log_inferno.txt");
+	logmsg("Inferno driver started...\n")
+
+	int ret = setup_umd_device();
+
+	if (ret < 0) {
+		return ret;
+	}
+
+	logmsg3("[INFO]: UMD File: %s\n", g_iso_fn);
+
+	ret = init_inferno();
+
+	return MIN(ret, 0);
+}
+
+int module_stop(SceSize args, void *argp) {
+	sceIoDelDrv("umd");
+	sceKernelDeleteEventFlag(g_drive_status_evf);
+	sceKernelUnregisterSysEventHandler(&g_power_event);
+
+	return 0;
+}

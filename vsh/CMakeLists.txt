@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.2)
+cmake_minimum_required(VERSION 3.28)
 
 if(NOT DEFINED CMAKE_TOOLCHAIN_FILE)
   if(DEFINED ENV{VITASDK})
@@ -18,12 +18,17 @@ add_executable(adrenaline_vsh
   main.c
 )
 
+target_link_directories(adrenaline_vsh PRIVATE ${CMAKE_BINARY_DIR}/kernel)
+
 target_link_libraries(adrenaline_vsh
+  AdrenalineKernel_stub
   taihen_stub
   SceLibKernel_stub
   SceAppMgr_stub
+  SceKernelThreadMgr_stub
   SceLsdb_stub_weak
   SceIofilemgr_stub
+  SceAVConfig_stub
 )
 
 vita_create_self(adrenaline_vsh.suprx adrenaline_vsh CONFIG exports.yml UNSAFE)

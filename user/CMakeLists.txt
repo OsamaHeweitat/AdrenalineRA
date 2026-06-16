@@ -9,6 +9,9 @@ if(NOT DEFINED CMAKE_TOOLCHAIN_FILE)
 endif()
 
 project(adrenaline_user)
+set(CMAKE_C_STANDARD 17)
+set(CMAKE_C_STANDARD_REQUIRED ON)
+set(CMAKE_C_EXTENSIONS ON)
 include("${VITASDK}/share/vita.cmake" REQUIRED)
 
 include(ExternalProject)
@@ -103,8 +106,9 @@ file(GLOB RCHEEVOS_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/rcheevos/src/rhash/*.c
 )
 
-# Ensure RC_CLIENT_SUPPORTS_HASH is defined so rcheevos hash support is enabled
-add_definitions(-DRC_CLIENT_SUPPORTS_HASH)
+# Ensure RC_CLIENT_SUPPORTS_HASH is defined so rcheevos hash support is enabled.
+# RC_NO_THREADS avoids pulling Vita pthread/newlib thread glue into this module.
+add_definitions(-DRC_CLIENT_SUPPORTS_HASH -DRC_NO_THREADS)
 
 add_executable(adrenaline_user
   ${cef_res}
@@ -126,6 +130,7 @@ add_executable(adrenaline_user
   lz4/lz4.c
   retroachievements.c
   virtualsfo.c
+  vita_newlib_compat.c
   ${RCHEEVOS_SOURCES}  # Add rcheevos source files
   dummy_fini.c
   lodepng/lodepng.c
@@ -180,7 +185,6 @@ target_link_libraries(adrenaline_user
   SceVshBridge_stub
   SceLiveArea_stub_weak
   luajit-5.1
-  pthread
   m
   dl
   z
@@ -211,4 +215,3 @@ add_custom_target(user_all
   ALL
   DEPENDS adrenaline_user.suprx-self
 )
-

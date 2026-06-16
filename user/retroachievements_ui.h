@@ -7,7 +7,11 @@
 
 // Notification system
 void trigger_notification(const char* message, unsigned duration_us, vita2d_texture* image);
+void trigger_vita2d_notification(const char* message, unsigned duration_us, vita2d_texture* image);
+void trigger_vita2d_top_right_notification(const char* message, unsigned duration_us, vita2d_texture* image);
 void draw_notification(void);
+void draw_vita2d_notification(void);
+void draw_vita2d_top_right_notification(void);
 void check_and_show_pending_notification(void);
 
 // Achievements menu

@@ -4,6 +4,8 @@
 #include <psp2/io/dirent.h>
 #include <psp2/io/fcntl.h>
 #include <psp2/io/devctl.h>
+#include <psp2/kernel/clib.h>
+#include <string.h>
 extern char g_ra_username[128];
 extern char g_ra_password[128];
 

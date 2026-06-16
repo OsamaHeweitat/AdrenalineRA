@@ -638,6 +638,7 @@ static void migrate_config_717(AdrenalineConfig717* old, AdrenalineConfig* new) 
 	new->psp_screen_scale_y = old->psp_screen_scale_y;
 	new->ps1_screen_scale_x = old->ps1_screen_scale_x;
 	new->ps1_screen_scale_y = old->ps1_screen_scale_y;
+	new->hardcore_mode = old->hardcore_mode;
 	new->magic[1] = ADRENALINE_CFG_MAGIC_2;
 }
 

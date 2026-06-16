@@ -10,6 +10,9 @@
 #include <psp2/io/fcntl.h>
 #include <psp2/io/stat.h>
 #include <psp2/io/dirent.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <vita2d.h>
 
 void net_init() {
@@ -248,7 +251,7 @@ vita2d_texture* download_image_texture(const char* image_url, const char* cache_
         return NULL;
     }
     
-    // sceClibPrintf("[RA DEBUG] Downloading image from: %s\n", image_url);
+    sceClibPrintf("[RA DEBUG] Downloading image from: %s\n", image_url);
     
     // Determine file path - use cache if provided, otherwise temp
     char file_path[256];
@@ -265,15 +268,20 @@ vita2d_texture* download_image_texture(const char* image_url, const char* cache_
         if (sceIoGetstat(file_path, &stat) >= 0) {
             sceClibPrintf("[RA DEBUG] Using cached image: %s\n", file_path);
             vita2d_texture* texture = vita2d_load_JPEG_file(file_path);
+            sceClibPrintf("[RA DEBUG] Loaded cached image as JPEG texture: %p\n", texture);
             if (!texture) {
+                sceClibPrintf("[RA DEBUG] Failed to load cached image as JPEG, trying PNG\n");
                 texture = vita2d_load_PNG_file(file_path);
             }
             if (texture) {
+                sceClibPrintf("[RA DEBUG] Successfully loaded cached image texture: %p\n", texture);
                 return texture;
             }
         }
     }
     
+    sceClibPrintf("[RA DEBUG] Downloading image to: %s\n", file_path);
+
     int tpl = sceHttpCreateTemplate("Adrenaline/1.0-debug (PSVita)", 1, 1);
     if (tpl < 0) {
         sceClibPrintf("[RA DEBUG] Failed to create HTTP template for image\n");
@@ -348,12 +356,12 @@ vita2d_texture* download_image_texture(const char* image_url, const char* cache_
         return NULL;
     }
     
-    // sceClibPrintf("[RA DEBUG] Downloaded %d bytes of image data to %s\n", total_read, file_path);
+    sceClibPrintf("[RA DEBUG] Downloaded %d bytes of image data to %s\n", total_read, file_path);
     
     // Load the image as a vita2d texture
     vita2d_texture* texture = vita2d_load_JPEG_file(file_path);
     if (!texture) {
-        // sceClibPrintf("[RA DEBUG] Failed to load image as JPEG texture\n");
+        sceClibPrintf("[RA DEBUG] Failed to load image as JPEG texture\n");
         // Try PNG as fallback
         texture = vita2d_load_PNG_file(file_path);
         if (!texture) {

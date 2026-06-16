@@ -1,6 +1,10 @@
 #include <psp2/io/devctl.h>
 #include <psp2/io/dirent.h>
 #include <psp2/io/fcntl.h>
+#include <psp2/kernel/clib.h>
+#include <stdlib.h>
+#include <string.h>
+#include <strings.h>
 #include "virtualsfo.h"
 #define ISO_SECTOR_SIZE 2048
 

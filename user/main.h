@@ -105,6 +105,7 @@ typedef struct {
 	float ps1_screen_scale_x;
 	float ps1_screen_scale_y;
 	uint8_t cfw_type;
+	uint8_t hardcore_mode;
 } AdrenalineConfig;
 
 extern AdrenalineConfig config;

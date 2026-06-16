@@ -2,16 +2,20 @@
 #include <psp2/io/fcntl.h>
 #include <psp2/io/devctl.h>
 #include <psp2/io/stat.h>
+#include <psp2/kernel/clib.h>
+#include <psp2/kernel/threadmgr.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 #include "main.h"
 #include "menu.h"
-#include "../adrenaline_compat.h"
 #include <ctype.h>
 
+#include "retroachievements.h"
 #include "retroachievements_iso_parser.h"
 #include "retroachievements_config.h"
+#include "retroachievements_ui.h"
 
 typedef struct {
     char titleid[MAX_TITLEID];

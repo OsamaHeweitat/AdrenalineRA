@@ -22,6 +22,7 @@
 #include <psp2/kernel/dmac.h>
 #include <psp2/kernel/sysmem.h>
 #include <psp2/kernel/processmgr.h>
+#include <psp2/kernel/clib.h>
 
 #include <stdio.h>
 #include <stdarg.h>

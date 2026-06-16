@@ -16,7 +16,6 @@
 
 #include "main.h"
 #include "menu.h"
-#include "../adrenaline_compat.h"
 #include <ctype.h>
 
 #include <vita2d.h>

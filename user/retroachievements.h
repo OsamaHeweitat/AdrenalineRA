@@ -20,6 +20,9 @@ void load_game(const uint8_t* rom, size_t rom_size);
 void load_game_from_file(const char* path);
 void destroy_retroachievements_client(void);
 void update_credentials_from_menu(void);
+void store_retroachievements_credentials(const char* username, const char* token);
+void store_retroachievements_credentials_from_menu(const char* username, const char* token);
+int load_retroachievements_credentials(char* username, size_t username_size, char* token, size_t token_size);
 
 // Game detection functions
 void start_game_detection(void);

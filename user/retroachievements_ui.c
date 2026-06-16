@@ -1,9 +1,14 @@
 #include "retroachievements_config.h"
 #include "retroachievements.h"
 #include "retroachievements_ui.h"
+#include "retroachievements_network.h"
 #include <rc_client.h>
 #include "menu.h"
 #include "utils.h"
+#include <psp2/kernel/clib.h>
+#include <psp2/kernel/processmgr.h>
+#include <stdio.h>
+#include <string.h>
 #include <vita2d.h>
 
 #define MAX_MENU_ITEMS 128
@@ -365,15 +370,19 @@ void menu_append_item(vita2d_texture* image, const char* title, const char* desc
 }
 
 void check_and_show_pending_notification(void) {
+    sceClibPrintf("[RA DEBUG] check_and_show_pending_notification called\n");
     if (g_pending_notification.pending) {
         vita2d_texture* image = NULL;
         if (g_pending_notification.image_url[0]) {
             if (g_pending_notification.is_badge) {
+                sceClibPrintf("[RA DEBUG] check_and_show_pending_notification: downloading badge image\n");
                 image = download_image_texture(g_pending_notification.image_url, g_pending_notification.cache_name);
             } else {
+                sceClibPrintf("[RA DEBUG] check_and_show_pending_notification: downloading non-badge image\n");
                 image = download_image_texture(g_pending_notification.image_url, g_pending_notification.cache_name);
             }
         }
+        sceClibPrintf("[RA DEBUG] check_and_show_pending_notification: triggering notification\n");
         trigger_vita2d_notification(g_pending_notification.message, 3000000, image);
         g_pending_notification.pending = 0;
     }

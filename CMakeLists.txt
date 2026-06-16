@@ -8,6 +8,9 @@ set(CMAKE_TOOLCHAIN_FILE "$ENV{VITASDK}/share/vita.toolchain.cmake" CACHE PATH "
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 project(adrenaline)
+set(CMAKE_C_STANDARD 17)
+set(CMAKE_C_STANDARD_REQUIRED ON)
+set(CMAKE_C_EXTENSIONS ON)
 include("${VITASDK}/share/vita.cmake" REQUIRED)
 
 set(NIGHTLY_CMAKE_PARAM "")

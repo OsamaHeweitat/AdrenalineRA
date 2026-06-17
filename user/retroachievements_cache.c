@@ -31,7 +31,7 @@ void save_titleid_cache() {
     // Create cache directory if it doesn't exist
     sceIoMkdir(CACHE_DIR, 0777);
     
-    // Open ISO directory
+    // open ISO directory
     SceUID dir = sceIoDopen(ISO_DIR);
     if (dir < 0) {
         sceClibPrintf("[RA DEBUG] Could not open ISO directory: %s\n", ISO_DIR);
@@ -86,7 +86,7 @@ void save_titleid_cache() {
                   processed_count, success_count);
 }
 
-// Load cache from file
+// load cache from file
 void load_titleid_cache() {
     titleid_cache_count = 0;
     SceUID fd = sceIoOpen(CACHE_FILE, SCE_O_RDONLY, 0);
@@ -175,7 +175,7 @@ int titleid_polling_thread(SceSize args, void* argp) {
                     snprintf(game_path, sizeof(game_path), "%s/%s/EBOOT.PBP", GAME_DIR, titleid);
                     load_game_from_file(game_path);
                 }
-                // Even if path not found, mark as loaded to avoid repeated attempts
+                // even if path not found, mark as loaded to avoid repeated attempts
                 game_loaded = 1;
             }
             strncpy(last_titleid, titleid, MAX_TITLEID-1);

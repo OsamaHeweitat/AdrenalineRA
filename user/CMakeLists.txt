@@ -107,8 +107,7 @@ file(GLOB RCHEEVOS_SOURCES
 )
 
 # Ensure RC_CLIENT_SUPPORTS_HASH is defined so rcheevos hash support is enabled.
-# RC_NO_THREADS avoids pulling Vita pthread/newlib thread glue into this module.
-add_definitions(-DRC_CLIENT_SUPPORTS_HASH -DRC_NO_THREADS)
+add_definitions(-DRC_CLIENT_SUPPORTS_HASH)
 
 add_executable(adrenaline_user
   ${cef_res}

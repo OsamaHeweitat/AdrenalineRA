@@ -81,6 +81,9 @@ RC_BEGIN_C_DECLS
   typedef struct rc_mutex_t {
     void* handle; /* HANDLE is defined as "void*" */
   } rc_mutex_t;
+ #elif defined(__vita__)
+  #include <psp2/kernel/threadmgr/lw_mutex.h>
+  typedef SceKernelLwMutexWork rc_mutex_t;
  #else
   #include <pthread.h>
   typedef pthread_mutex_t rc_mutex_t;

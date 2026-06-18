@@ -138,6 +138,28 @@ void rc_mutex_unlock(rc_mutex_t* mutex)
   LWP_MutexUnlock(mutex);
 }
 
+#elif defined(__vita__)
+
+void rc_mutex_init(rc_mutex_t* mutex)
+{
+  sceKernelCreateLwMutex(mutex, "rc_mutex", 0, 1, NULL);
+}
+
+void rc_mutex_destroy(rc_mutex_t* mutex)
+{
+  sceKernelDeleteLwMutex(mutex);
+}
+
+void rc_mutex_lock(rc_mutex_t* mutex)
+{
+  sceKernelLockLwMutex(mutex, 1, NULL);
+}
+
+void rc_mutex_unlock(rc_mutex_t* mutex)
+{
+  sceKernelUnlockLwMutex(mutex, 1);
+}
+
 #else
 
 void rc_mutex_init(rc_mutex_t* mutex)
